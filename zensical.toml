@@ -36,6 +36,7 @@ nav = [
   { "Development" = [
     { "Contributing" = "development/index.md" },
     { "Testing and CI" = "development/testing.md" },
+    { "Localisation" = "development/localization.md" },
     { "Signed releases" = "development/signed-releases.md" },
     { "Internals" = "development/internals.md" },
   ] },

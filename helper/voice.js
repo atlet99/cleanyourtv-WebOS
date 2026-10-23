@@ -249,7 +249,7 @@ async function askHa(text) {
   const type = String(res.response_type || ''), code = String(res.data && res.data.code || '');
   const speech = String(res.speech && res.speech.plain && res.speech.plain.speech || '').trim();
   if (o.conversation_id) haConv = { id: String(o.conversation_id), at: Date.now() };
-  return { text: speech || (type === 'action_done' ? 'Done' : ''), understood: !(type === 'error' && code === 'no_intent_match'), type, code };
+  return { text: speech || (type === 'action_done' ? 'Done' : ''), generated: !speech && type === 'action_done', understood: !(type === 'error' && code === 'no_intent_match'), type, code };
 }
 async function haTest() {
   const h = haCfg();
@@ -272,11 +272,11 @@ async function respond(text, card) {
   const useHa = haReady(h) && h.route !== 'ai-only', useAi = l.enabled && l.key && !(useHa && h.route === 'ha-only');
   if (!useHa && !useAi && !c.url) { await say({ kind: 'answer', title: 'You said', text, seconds: readSeconds(text) }); return out; }
   if (useHa || useAi) await say({ kind: 'thinking', title: 'Thinking', question: text, text: '', seconds: 90 });
-  let haText = '';
+  let haText = '', generatedAnswer = false;
   if (useHa) {
     try {
       const r = await askHa(text); haText = r.text;
-      if (r.understood && r.text) { out.answer = r.text; out.via = 'ha'; }
+      if (r.understood && r.text) { out.answer = r.text; out.via = 'ha'; generatedAnswer = r.generated; }
     } catch (e) { out.error = 'Home Assistant: ' + e.message; }
   }
   if (!out.answer && useAi) {
@@ -290,7 +290,7 @@ async function respond(text, card) {
       if (r && !out.answer) { out.answer = r.text; out.card = r; }
     } catch (e) { out.error = (out.error ? out.error + '; ' : '') + e.message; }
   }
-  if (out.answer || (out.card && out.card.image)) await say(Object.assign({ kind: 'answer', title: out.via === 'ha' ? 'Home Assistant' : 'Answer', question: text, text: out.answer || '', seconds: readSeconds(out.answer) }, out.card && out.card.image ? { image: out.card.image } : {}, out.card && out.card.seconds ? { seconds: out.card.seconds } : {}));
+  if (out.answer || (out.card && out.card.image)) await say(Object.assign({ kind: 'answer', title: out.via === 'ha' ? 'Home Assistant' : 'Answer', question: text, text: out.answer || '', seconds: readSeconds(out.answer) }, generatedAnswer ? { textKey: 'Done' } : {}, out.card && out.card.image ? { image: out.card.image } : {}, out.card && out.card.seconds ? { seconds: out.card.seconds } : {}));
   else if (out.error) await say({ kind: 'answer', title: 'Not answered', question: text, text: out.error, seconds: 10 });
   else await say({ kind: 'answer', title: 'You said', text, seconds: readSeconds(text) });
   return out;

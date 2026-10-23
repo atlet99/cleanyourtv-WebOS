@@ -39,6 +39,7 @@ async function show(b, internal) {
   const p = { title: String(b.title || '').slice(0, 120), text: String(b.text || '').slice(0, kind ? 1500 : 400),
     seconds: Math.max(2, Math.min(120, +b.seconds || 8)), position: /^(top|middle|bottom)-(left|center|right)$/.test(b.position) ? b.position : (kind ? 'bottom-center' : 'top-right') };
   if (kind) { p.kind = kind; p.question = String(b.question || '').slice(0, 300); }
+  if (kind && b.textKey === 'Done') p.textKey = 'Done';   // generated completion, not an external answer
   if (b.image) {
     try { const id = String(++seq); images.set(id, await fetchImage(String(b.image))); if (images.size > 5) images.delete(images.keys().next().value); p.image = 'http://127.0.0.1:8765/api/notify/img?id=' + id; }
     catch (e) { p.imageError = String(e.message || e).slice(0, 200); }

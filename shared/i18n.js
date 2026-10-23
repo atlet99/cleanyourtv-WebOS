@@ -200,7 +200,7 @@
     'this launcher does not support API authorization':'Эта версия главного экрана не поддерживает защищённый API',
     'no compatible previous launcher; restarting with LG Home':'Совместимая предыдущая версия не сохранена. После перезагрузки откроется главный экран LG',
     'Dock':'Избранные приложения', 'LG Home':'Главный экран LG', 'No channels':'Каналы не найдены', 'no picture':'Нет изображения',
-    'GEO':'Ограничение по региону', 'NOT 24/7':'Не круглосуточно', 'HEADERS':'Особые HTTP-заголовки',
+    'GEO':'Геоблокировка', 'NOT 24/7':'По расписанию', 'HEADERS':'HTTP-заголовки',
     'The service ({0}) is older than this launcher needs: update it in the CleanYourTV manager':'Служба версии {0} устарела для этого главного экрана. Обновите её в приложении CleanYourTV',
     'per million input tokens':'за миллион входных токенов', '(test build)':'(тестовая сборка)',
     'Launcher':'Главный экран', 'Service':'Служба', 'Go back to launcher':'Вернуть предыдущий главный экран', 'Update to':'Обновить',
@@ -216,7 +216,47 @@
     'that does not look like Home Assistant ({0} was not found)':'Сервер не похож на Home Assistant: путь {0} не найден',
     'bad request':'Некорректный запрос', 'bad playlist address':'Некорректный адрес плейлиста', 'no such stream':'Поток не найден',
     'unsafe service directory':'Каталог службы имеет небезопасные права или владельца', 'unsafe API token file':'Файл токена API имеет небезопасный тип, права или владельца',
-    'invalid API token':'Файл токена API повреждён', 'unsafe runtime directory':'Служебный каталог имеет небезопасные права или владельца'
+    'invalid API token':'Файл токена API повреждён', 'unsafe runtime directory':'Служебный каталог имеет небезопасные права или владельца',
+    'listening':'Слушаем', 'already listening':'Микрофон уже включён', 'installing':'Идёт установка', 'already up to date':'Установлена актуальная версия',
+    'installed {0}, latest {1}':'Установлено: {0}. Последняя версия: {1}', 'downloading {0}':'Загружаем {0}', 'installing {0}':'Устанавливаем {0}',
+    'restarting the service':'Перезапускаем службу', 'updated to {0}. Close CleanYourTV and open it again.':'Установлена версия {0}. Закройте и снова откройте CleanYourTV.',
+    'too many redirects':'Сервер возвращает слишком много перенаправлений', 'HTTP {0} from {1}':'Сервер {1} вернул HTTP {0}',
+    'checksum mismatch for {0}; nothing was installed':'Контрольная сумма файла {0} не совпала. Установка отменена',
+    'the recogniser stopped ({0}): {1}':'Распознавание речи остановлено (код {0}): {1}',
+    'OpenRouter answered {0}':'OpenRouter вернул HTTP {0}', 'the model list could not be read':'Не удалось загрузить список моделей', 'Done':'Готово',
+    'registering the overlay apps (the screen blinks once)':'Регистрируем окна источников и уведомлений. Экран один раз мигнёт',
+    'run as root':'Для установки нужны права root', 'this does not look like webOS (no luna-send)':'Система не похожа на webOS: команда luna-send не найдена',
+    '{0} not found: root with the Homebrew Channel is required (https://rootmy.tv)':'Каталог {0} не найден. Нужен root-доступ через Homebrew Channel (https://rootmy.tv)',
+    '/media/developer is not writable':'Каталог /media/developer недоступен для записи', 'missing tool: {0}':'Не найдена необходимая программа: {0}',
+    'this TV has no systemd (webOS older than 5): CleanYourTV needs a newer webOS and cannot be set up here. Nothing was changed.':'На телевизоре нет systemd. Нужна webOS 5 или новее. Настройка отменена без изменений',
+    "this TV's Node.js ({0}) is too old for the service: CleanYourTV needs a newer webOS and cannot be set up here. Nothing was changed.":'Версия Node.js ({0}) не поддерживается. Нужна более новая webOS. Настройка отменена без изменений',
+    'the service files are incomplete in {0}':'В каталоге {0} отсутствует часть файлов службы', 'stock Home app not found at {0}':'Оригинальный главный экран LG не найден в {0}',
+    'could not create service directory':'Не удалось создать каталог службы', 'service directory must not be a symbolic link':'Каталог службы не должен быть символической ссылкой',
+    'could not secure service directory':'Не удалось установить безопасные права на каталог службы',
+    'Home is already replaced but no backup exists; reboot the TV once, then run this again':'Главный экран уже заменён, но резервная копия не найдена. Перезагрузите ТВ и повторите настройку',
+    'picture notifications use the {0} window on this TV (webOS SDK {1})':'Выбран тип окна уведомлений: {0} (webOS SDK {1})',
+    'TV: {0}, firmware {1}, webOS SDK {2}':'Телевизор: {0}, прошивка {1}, webOS SDK {2}',
+    "this firmware is in the compatibility list ({0}); LG's Home app is '{1}'":'Прошивка есть в списке совместимости ({0}). Тип главного экрана LG: {1}',
+    "firmware {0} is not in the compatibility list; continuing because LG's Home is the flutter or web kind this was written for. The original state is saved and a failed start restarts the TV with LG's Home.":'Прошивка {0} не проверена, но тип главного экрана поддерживается. Продолжаем с резервной копией; при сбое вернётся экран LG',
+    "firmware {0} is not in the compatibility list and LG's Home app is '{1}', not the flutter or web app this was tested with; continuing because of --force":'Прошивка {0} и тип главного экрана {1} не проверены. Продолжаем, поскольку задан --force',
+    "LG's Home app looks different from what this expects (found: {0}; firmware {1} is not in the compatibility list). To try anyway use 'Set up anyway' in the app, or run bootstrap.sh install --force. The original is saved and a failed start is rolled back with a restart.":'Главный экран LG отличается от поддерживаемого: {0}, прошивка {1}. Для попытки установки выберите «Установить на этой прошивке» или задайте --force. При сбое будет восстановлен экран LG',
+    'launcher {0} in place':'Главный экран версии {0} подготовлен', 'service {0} installed in {1}; boot scripts in {2}':'Служба {0} установлена в {1}; сценарии автозапуска — в {2}',
+    'done. Everything takes effect at the next reboot.':'Готово. Изменения вступят в силу после перезагрузки',
+    'the new service ({0}) did not come up; going back to the previous files':'Новая служба не запустилась ({0}). Восстанавливаем предыдущие файлы',
+    'service {0} is running':'Служба версии {0} работает', 'starting (the screen blinks once while the system app manager restarts)':'Запускаем службу. При перезапуске диспетчера приложений экран один раз мигнёт',
+    'checking that the new Home came up...':'Проверяем запуск нового главного экрана…',
+    'the new Home did not come up (app type: {0}, service: {1}); rolling back':'Главный экран не запустился (тип: {0}, служба: {1}). Восстанавливаем исходное состояние',
+    "rolled back: the boot scripts are removed and the TV restarts with LG's Home. Details: /media/developer/cleanyourtv/run/setup.log and setup.log.service":'Настройка отменена. Автозапуск удалён; после перезагрузки откроется экран LG. Журналы: /media/developer/cleanyourtv/run/setup.log и setup.log.service',
+    'done. Hold OK on an app to customise the dock, or use the Customise button at the top right.':'Готово. Для настройки избранного удерживайте OK на приложении или выберите «Настроить экран» справа вверху',
+    "This TV also has LG's full-screen Home. If the Home button opens that instead of CleanYourTV: TV Settings > General > Home Settings > Home Style > Basic.":'Если Home открывает полноэкранное меню LG, выберите базовый стиль в настройках ТВ: Общие → Настройки главного экрана → Стиль главного экрана',
+    "Back to LG's Home any time: switch off 'CleanYourTV as Home' in the manager app, or run: sh {0}/undo-home.sh":'Чтобы вернуть экран LG, отключите «Главный экран CleanYourTV» в менеджере или выполните sh {0}/undo-home.sh',
+    'Warning: {0}':'Предупреждение: {0}',
+    'the model list is too large':'Размер списка моделей превышает допустимый', 'OpenRouter did not answer':'OpenRouter не ответил вовремя',
+    'send {"text": "..."}':'Передайте текст запроса в JSON-поле "text"', 'POST expected':'Для этой операции нужен POST-запрос',
+    'not a test build':'Недопустимый идентификатор тестовой сборки', 'unknown action':'Неизвестная операция',
+    'not a valid address':'Некорректный адрес', 'address must start with http:// or https://':'Адрес должен начинаться с http:// или https://',
+    'timed out':'Время ожидания истекло', 'nothing to show':'В уведомлении нет текста или изображения',
+    'Home Assistant: {0}':'Home Assistant: {0}', 'OpenRouter: {0}':'OpenRouter: {0}', 'Notification':'Уведомление'
   };
   var HELP = {
     'Launcher':'Главный экран телевизора. Перед обновлением проверяются цифровая подпись выпуска и SHA-256. Если новая версия не запустится, будет восстановлена предыдущая.',
@@ -270,8 +310,9 @@
     'Set up now':'Устанавливает главный экран, добавляет автозапуск и запускает службу. Занимает около минуты, экран один раз мигнёт. При сбое запуска ТВ перезагрузится с главным экраном LG.',
     'Set up anyway':'Прошивка не проверена, а главный экран LG отличается от поддерживаемого варианта. Будет предпринята попытка установки; при сбое запуска восстановится экран LG.'
   };
-  // Add a complete language here. The checker compares every catalogue with tools/i18n-source.json.
+  // Add a complete language here. English source strings are keys; tools/i18n-keys.json locks their count and fingerprint.
   var catalogs = { ru: { messages: RU, help: HELP } }, templateCache = {};
+  function hasCatalog(lang) { return Object.prototype.hasOwnProperty.call(catalogs, lang); }
   function templatesFor(lang) {
     if (templateCache[lang]) return templateCache[lang];
     var messages = catalogs[lang].messages, templates = [], key;
@@ -291,7 +332,7 @@
   var current = typeof window !== 'undefined' ? language((window.webOSSystem && window.webOSSystem.locale) || navigator.language) : 'en';
   function t(value, lang, depth) {
     var text = String(value == null ? '' : value); lang = language(lang || current); depth = depth || 0;
-    if (!catalogs[lang] || !text || depth > 4) return text;
+    if (!hasCatalog(lang) || !text || depth > 4) return text;
     var messages = catalogs[lang].messages, templates = templatesFor(lang);
     if (Object.prototype.hasOwnProperty.call(messages, text)) return messages[text];
     // Formatting is not part of a message key. Preserve it around the translated text.
@@ -310,8 +351,12 @@
   function format(key, values, lang) {
     return t(key, lang).replace(/\{(\d+)\}/g, function (slot, n) { return values && values[n] !== undefined ? String(values[n]) : slot; });
   }
+  function helpText(key, fallback, lang) {
+    var code = language(lang || current), catalog = hasCatalog(code) ? catalogs[code] : null;
+    return catalog && Object.prototype.hasOwnProperty.call(catalog.help, key) ? catalog.help[key] : (fallback || '');
+  }
   function error(value, lang, depth) {
-    var text = String(value || ''), wrappers = ['guide: ', 'Install failed: ', 'Update failed: ', 'Could not check: '];
+    var text = String(value || ''), wrappers = ['guide: ', 'Install failed: ', 'Update failed: ', 'Could not check: ', 'Setup stopped: ', 'Could not start the setup: ', 'Home Assistant: ', 'OpenRouter: '];
     depth = depth || 0;
     if (depth < 4) for (var i = 0; i < wrappers.length; i++) if (text.indexOf(wrappers[i]) === 0) {
       return format(wrappers[i] + '{0}', [error(text.slice(wrappers[i].length), lang, depth + 1)], lang);
@@ -320,8 +365,14 @@
     // Unknown OS/provider details remain verbatim, with a localised error label.
     return translated === text && text ? format('Error: {0}', [text], lang) : translated;
   }
+  function logLine(value, lang) {
+    var text = String(value || '').replace(/^\[cleanyourtv\] /, '');
+    if (/^ERROR[: ]/.test(text)) return error(text.replace(/^ERROR:?\s*/, ''), lang);
+    if (/^WARN(?:ING)?[: ]/.test(text)) return format('Warning: {0}', [t(text.replace(/^WARN(?:ING)?:?\s*/, ''), lang)], lang);
+    return t(text, lang);
+  }
   function html(source, lang) {
-    if (!catalogs[language(lang || current)]) return source;
+    if (!hasCatalog(language(lang || current))) return source;
     // Only static markup uses this: script/style bodies, values and URLs are never translated.
     return source.split(/(<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>|<textarea\b[\s\S]*?<\/textarea>|<option\b[\s\S]*?<\/option>|<[^>]+>)/gi).map(function (part) {
       if (/^<(script|style|textarea|option)\b/i.test(part)) return part;
@@ -329,6 +380,6 @@
       return t(part, lang);
     }).join('');
   }
-  var api = { t: t, format: format, error: error, html: html, language: language, catalogs: catalogs, ru: RU, help: catalogs[current] ? catalogs[current].help : {} };
+  var api = { t: t, format: format, error: error, logLine: logLine, html: html, helpText: helpText, language: language, catalogs: catalogs, ru: RU, help: hasCatalog(current) ? catalogs[current].help : {} };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.CYTV_I18N = api;
 })(this);

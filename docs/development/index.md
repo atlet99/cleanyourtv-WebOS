@@ -16,7 +16,7 @@ reports from TVs that are not in the [tested list](../tested-tvs.md).
 | `themes/` | The bundled [themes](../themes.md) (JSON files and wallpapers); [contribute one](../themes.md#contributing-a-theme). |
 | `helper/` | The root service (Node.js): API, Live TV, notifications, voice, manager, input hook, share log, self-update. |
 | `scripts/` | Boot, setup and restore scripts: `bootstrap.sh`, `10-cleanyourtv-home`, `stage-home.sh`, `undo-home.sh`, the debloat scripts. |
-| `shared/` | `flexgap.js`, added to every page by the build for older Chromium. |
+| `shared/` | API access, shared localisation dictionaries and `flexgap.js`, embedded in the TV pages by the build. |
 | `voice/` | Source of the small speech program `cytv-asr` and its build script. |
 | `third-party/` | The bundled inputhook files and the QR library. |
 | `tools/` | `node8-check.sh`: service and theme checks under Node 8.12.0; `theme-docs.js`: regenerates the table of theme settings in the docs. |
@@ -43,6 +43,7 @@ each. Attach them to a GitHub release tagged `v<version>`. The **service** versi
   and opacity are animated, because the TV's GPU is weak. No flex `gap` without the polyfill the build adds.
 - **Do not store private data in the repository.** No playlist addresses, access keys, IP addresses or names.
 - **Documentation must match the code.** When a feature changes, change its page here and, if it is mentioned there, the README.
+- **Localisation must match the source keys.** See [Localisation](localization.md) for adding a language and running the key/parameter checks.
 - **Licence.** The project is MIT. Do not copy code from GPL projects into it; describe behaviour and write your own.
 
 ## Adding a TV to the tested list

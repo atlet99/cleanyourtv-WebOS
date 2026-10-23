@@ -243,7 +243,7 @@ var INFO={
  'Set up now':'Installs the launcher, replaces LG\u2019s Home at boot and starts the service. About a minute; the screen blinks once. If the new Home does not come up, the setup removes itself and restarts the TV.',
  'Set up anyway':'Your firmware is not in the compatibility list and LG\u2019s Home looks different. This tries it anyway; a failed start restarts the TV with LG\u2019s Home.'
 };
-function infoFor(r){if(!r||r.sep)return null;var k=r.label.replace(/ [0-9][0-9.]*$/,''),d=CYTV_I18N.help[k]||INFO[k];if(k==='Check for updates'&&offline)d=t('Works without the service: looks for a newer package and installs it through the root service.');if(k==='CleanYourTV as Home'&&st.home&&st.home.fullhome)d+=' '+t('This TV also has LG’s full-screen Home: if Home opens that screen, choose Basic in TV Settings > General > Home Settings > Home Style.');return d?{t:k,d:d}:null}
+function infoFor(r){if(!r||r.sep)return null;var k=r.label.replace(/ [0-9][0-9.]*$/,''),d=CYTV_I18N.helpText(k,INFO[k]);if(k==='Check for updates'&&offline)d=t('Works without the service: looks for a newer package and installs it through the root service.');if(k==='CleanYourTV as Home'&&st.home&&st.home.fullhome)d+=' '+t('This TV also has LG’s full-screen Home: if Home opens that screen, choose Basic in TV Settings > General > Home Settings > Home Style.');return d?{t:k,d:d}:null}
 function draw(){
   var h='';rows.forEach(function(r,i){h+=r.sep?'<div class="sep"></div>':'<div class="row'+(i===idx?' f':'')+(r.dim?' dim':'')+'" data-i="'+i+'"><span class="lb"></span>'+(r.sub?'<span class="st"></span>':'')+'</div>'});
   $('list').innerHTML=h;var el=$('list').children;rows.forEach(function(r,i){if(r.sep)return;el[i].querySelector('.lb').textContent=r.rawLabel?r.label:t(r.label);if(r.sub)el[i].querySelector('.st').textContent=t(r.sub)});
@@ -372,10 +372,10 @@ function offlineUpdate(){
 function pollUpdate(n){
   rootRun('tail -n 3 "$R/selfupdate.log" 2>/dev/null').then(function(m){
     var t=execOut(m).out.trim(),last=t.split('\n').pop();
-    if(/^DONE/.test(last)){upd=null;banner(last.replace(/^DONE /,''),'ok');build();draw();return}
+    if(/^DONE/.test(last)){upd=null;banner(CYTV_I18N.logLine(last.replace(/^DONE /,'')),'ok');build();draw();return}
     if(/^ERROR/.test(last)){banner('Update failed: '+last.replace(/^ERROR /,''),'err');return}
     if(n>120){banner('The update is taking too long. Log: /media/developer/cleanyourtv/run/selfupdate.log on the TV.','err');return}
-    if(last)banner('Updating\u2026 '+last,'work');
+    if(last)banner(CYTV_I18N.format('Updating… {0}',[CYTV_I18N.logLine(last)]),'work');
     setTimeout(function(){pollUpdate(n+1)},2000)})}
 /* the remote's Input and Home buttons differ between remotes and firmware: learn their codes from the hook, then test */
 function kShow(text,list){kText=text;kRows=list;build();idx=0;draw()}
@@ -445,8 +445,8 @@ function logTail(cb){rootRun('tail -n 3 "$R/setup.log" 2>/dev/null').then(functi
 function waitUp(n){api('/api/manager/status').then(function(s0){offline=false;banner('');load();if(!(s0.keys&&s0.keys.learned)&&s0.options&&s0.options.inputKey)setTimeout(function(){api('/api/manager/status').then(function(s){st=s;openKeys('input')})},1500)},function(){
   logTail(function(t){
     if(/ERROR|rolled back/.test(t)){forceOffer=/looks different/.test(t);build();draw();banner('Setup stopped: '+t.split('\n').pop().replace(/^ERROR: /,''),'err');return}
-    if(n>90){banner('The service did not start. Log: /media/developer/cleanyourtv/run/setup.log on the TV. '+t.split('\n').pop(),'err');return}
-    if(t)banner('Setting up\u2026 '+t.split('\n').pop(),'work');
+    if(n>90){banner(CYTV_I18N.format('The service did not start. Log: /media/developer/cleanyourtv/run/setup.log on the TV. {0}',[CYTV_I18N.logLine(t.split('\n').pop())]),'err');return}
+    if(t)banner(CYTV_I18N.format('Setting up… {0}',[CYTV_I18N.logLine(t.split('\n').pop())]),'work');
     setTimeout(function(){waitUp(n+1)},2000)})})}
 
 document.addEventListener('keydown',function(e){var k=e.keyCode;

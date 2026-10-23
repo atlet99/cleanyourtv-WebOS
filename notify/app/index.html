@@ -29,6 +29,7 @@ var card=document.getElementById('card'),img=document.getElementById('img'),time
 /* never take the remote or the pointer: an empty input region and key mask. Newer webOS wants an array; webOS 5 throws for that and
    wants a JSON string. The array goes first, the string only when that fails, so a TV that takes the array never sees the string. */
 function setBoth(name,value){try{webOSSystem[name](value)}catch(e){try{webOSSystem[name](JSON.stringify(value))}catch(e2){}}}
+document.title=CYTV_I18N.t('Notification');
 setBoth('setInputRegion',[{x:0,y:0,width:0,height:0}]);
 setBoth('setKeyMask',[]);
 /* safety net: if the region was not honoured and a key reaches this window anyway, close the card at once instead of holding the remote for the whole duration */
@@ -43,7 +44,8 @@ function show(){
   var inplace=!!p.kind&&card.classList.contains('on')&&card.className.indexOf('k-')>=0;   // a voice card that is already showing is updated without fading out
   if(!inplace)card.classList.remove('on');
   card.className=(card.classList.contains('on')?'on ':'')+(p.kind?'v k-'+p.kind:'');
-  document.getElementById('title').textContent=p.kind?CYTV_I18N.t(p.title||''):(p.title||'');document.getElementById('q').textContent=p.question||'';document.getElementById('text').textContent=p.kind&&p.title==='Not answered'?CYTV_I18N.error(p.text||''):(p.kind&&p.title==='Voice'?CYTV_I18N.t(p.text||''):(p.text||''));
+  document.getElementById('title').textContent=p.kind?CYTV_I18N.t(p.title||''):(p.title||'');document.getElementById('q').textContent=p.question||'';document.getElementById('text').textContent=p.kind&&(p.title==='Not answered'||p.title==='Voice')?CYTV_I18N.error(p.text||''):(p.text||'');
+  if(p.kind&&p.textKey==='Done')document.getElementById('text').textContent=CYTV_I18N.t('Done');
   if(p.imageError)document.getElementById('text').textContent+=(p.text?'\n':'')+CYTV_I18N.t('Image could not be loaded')+': '+CYTV_I18N.error(p.imageError);
   place(p.position||'top-right',!!p.kind);
   clearTimeout(timer);

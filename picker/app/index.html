@@ -53,6 +53,7 @@ var TX={
 var EN={Apps:'Apps',Inputs:'Inputs',Connected:'Connected',Live:'Live TV',LiveSub:'Your playlist',Nothing:'Nothing connected',nohelper:'Can\u2019t read the inputs. Live TV still works.'};
 var LANG=CYTV_I18N.language((window.webOSSystem&&webOSSystem.locale)||navigator.language||'en');
 function t(k){if(CYTV_I18N.catalogs[LANG])return CYTV_I18N.t(EN[k]||k,LANG);return (TX[LANG]&&TX[LANG][k])||EN[k]||k}
+document.title=t('Inputs');
 function $(i){return document.getElementById(i)}
 function call(uri,p){try{var b=new PalmServiceBridge();b.onservicecallback=function(){};b.call(uri,JSON.stringify(p));return true}catch(e){return false}}
 function log(m){CYTV.api(API+'/api/log?m='+encodeURIComponent('picker '+m)).catch(function(){})}

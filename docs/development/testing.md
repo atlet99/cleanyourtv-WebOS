@@ -22,6 +22,10 @@ Nothing leaves your machine. The script also runs on current Node: `node tools/n
 
 ## Pages
 
+Localisation checks run with `node tools/i18n-check.js` and inside the Node 8 suite. They compare key counts, exact key sets,
+duplicates, empty entries and template parameters, and exercise manager menus and phone forms.
+See [Localisation](localization.md) for coverage, adding languages and the reviewed key-set snapshot.
+
 The pages are plain HTML with no build step, so they can be opened in a desktop Chrome with a small mock of the service on
 `127.0.0.1:8765` and driven with scripted key events. That is how the launcher, Live TV and manager screens are checked before they
 go to a TV. The mock needs to answer `/api/apps`, `/api/live/*` and `/api/manager/*` with the shapes in [Service API](../api.md).
@@ -35,6 +39,7 @@ go to a TV. The mock needs to answer `/api/apps`, `/api/live/*` and `/api/manage
 | Workflow | When | What |
 |---|---|---|
 | `test-build.yml` | Every push to a branch other than `main` | Runs the Node 8 checks, builds the package with the commit in a `BUILD` file and publishes it as the pre-release `test-<branch>` |
+| `localization.yml` | Relevant pushes and pull requests, or manual run | Checks localisation dictionaries and rendering on Node 8.12.0 without release secrets |
 | `docs.yml` | Pushes that touch the documentation | Builds this site; deploys it to GitHub Pages from `main` |
 
 A test build appears in the manager app's **Update channel** list; see [Test builds](../managing.md#test-builds).

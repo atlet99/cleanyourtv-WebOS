@@ -153,6 +153,7 @@ const fake = (url, method) => { const res = { code: 0, out: '', writeHead(c) { t
       const reply = (type, speech, code) => send(200, { conversation_id: 'conv-1', response: { response_type: type, data: code ? { code } : {}, speech: { plain: { speech } } } });
       if (o.text === 'turn on the light') return reply('action_done', 'Turned on the light');
       if (o.text === 'quiet') return reply('action_done', '');
+      if (o.text === 'spoken done') return reply('query_answer', 'Done');
       if (o.text === 'slow') return setTimeout(() => reply('query_answer', 'Finally'), 600);
       reply('error', 'Sorry, I couldn\'t understand that', 'no_intent_match');
     });
@@ -176,6 +177,8 @@ const fake = (url, method) => { const res = { code: 0, out: '', writeHead(c) { t
   r = await vask('ask', { text: 'turn on the light', card: false }); ok(r.j.answer === 'Turned on the light' && r.j.via === 'ha', 'Assist answers an understood command');
   r = await vask('ask', { text: 'quiet', card: false }); ok(r.j.answer === 'Done', 'an action without speech shows Done');
   ok(haLog[1].conversation_id === 'conv-1' && !haLog[0].conversation_id, 'the conversation id is passed on to the next request');
+  await vask('ask', { text: 'quiet' }); ok(cards[cards.length - 1].textKey === 'Done', 'generated completion is marked for localisation');
+  await vask('ask', { text: 'spoken done' }); ok(cards[cards.length - 1].text === 'Done' && !cards[cards.length - 1].textKey, 'external answers are not marked for translation even when they match a message key');
   r = await vask('ask', { text: 'slow', card: false }); ok(r.j.answer === 'Finally', 'a slow answer is waited for');
   r = await vask('ask', { text: 'what is love', card: false }); ok(r.j.answer === 'Sorry, I couldn\'t understand that' && r.j.via === 'ha', 'not understood and no AI: Assist\'s own message is shown');
   await vask('set', { llm: { key: 'sk-test', enabled: true } });

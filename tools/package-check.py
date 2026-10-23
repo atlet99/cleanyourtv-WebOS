@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build with a temporary test key; inspect signatures and bundled pages. No TV is contacted."""
 import io
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -54,7 +55,10 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
                     key = archive.extractfile('./usr/palm/services/com.cleanyourtv.manager.service/helper/release-public.pem').read()
                     assert key == public.read_bytes()
                     assert not any('private.pem' in m.name for m in archive.getmembers())
-        print('ok   signed package/launcher, inlined offline assets, Russian catalogue and bundled public key')
+                    for app, title in [('picker', 'Источники'), ('notify', 'Уведомление')]:
+                        metadata = archive.extractfile('./usr/palm/applications/com.cleanyourtv.' + app + '/resources/ru/appinfo.json').read()
+                        assert json.loads(metadata)['title'] == title
+        print('ok   signed package/launcher, inlined offline assets, Russian catalogue/system titles and bundled public key')
     finally:
         # Leave ordinary dev output, never a release signed by an ephemeral test identity.
         env = dict(os.environ)
