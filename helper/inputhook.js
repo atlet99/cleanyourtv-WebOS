@@ -42,11 +42,12 @@ function ensure(enabled, key) {
   if (!(enabled || vkey || gkey) || busy || !fs.existsSync(HOOK + '/ezinject')) return;
   const todo = procs().filter(p => !hooked(p.pid));
   if (!todo.length) return;
+  const runtime = require('./security').runtime();
   busy = true;
   try { fs.chmodSync(HOOK + '/ezinject', 0o755); } catch (_) {}
   let left = todo.length;
   for (const p of todo) {
-    const log = '/tmp/lginput-hook-' + p.name + '.log';
+    const log = runtime + '/lginput-hook-' + p.name + '.log';
     try { fs.writeFileSync(log, ''); } catch (_) {}
     cp.execFile(HOOK + '/ezinject', ['-l', log, p.pid, HOOK + '/libinputhookpp.so'], { env: ENV, timeout: 20000 }, e => {
       if (e) console.error('inputhook: inject ' + p.name + ':', e.message);
@@ -54,7 +55,7 @@ function ensure(enabled, key) {
     });
   }
 }
-const HOOKLOG = '/tmp/lginput-hook-lginput2.log';
+const HOOKLOG = D + '/run/lginput-hook-lginput2.log';
 // What the hook reports about itself: did it find LG's input function and install?
 function hookInfo() {
   let t = ''; try { t = fs.readFileSync(HOOKLOG, 'utf8'); } catch (_) {}

@@ -159,7 +159,8 @@ right type. Anything else is ignored. The launcher draws the wallpaper once and 
 From a shell on the TV:
 
 ```sh
-curl localhost:8765/api/theme/list
-curl -X POST localhost:8765/api/theme/set -d '{"id":"midnight","accent":"#ff8a3d"}'
-curl -X POST localhost:8765/api/theme/revert
+TOKEN=$(node /media/developer/cleanyourtv/security.js token)
+curl -H "X-CYTV-Token: $TOKEN" localhost:8765/api/theme/list
+curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/theme/set -d '{"id":"midnight","accent":"#ff8a3d"}'
+curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/theme/revert
 ```

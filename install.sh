@@ -14,6 +14,8 @@ main() {
   ID=com.cleanyourtv.manager
   export PATH=/usr/bin:/usr/sbin:/bin:/sbin:$PATH
   say() { echo "[cleanyourtv] $*"; }
+  # Never follow an HTTPS release asset redirect to plain HTTP.
+  curl() { command curl --proto '=https' --proto-redir '=https' "$@"; }
   die() { echo "[cleanyourtv] ERROR: $*" >&2; exit 1; }
   case "$1" in -h|--help) sed -n '2,8p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'; return 0 ;; "") ;; *) die "unknown option: $1" ;; esac
 
@@ -39,21 +41,25 @@ main() {
       say "looking for the latest release of $REPO"
     fi
     curl -fsSL -H 'User-Agent: cleanyourtv-installer' "$API" > $T/release.json || die "could not read the release list (is there a release yet? for a branch: has its build finished?)"
-    node -e 'var j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")),a={};(j.assets||[]).forEach(function(x){a[x.name]=x.browser_download_url});var k=Object.keys(a).filter(function(n){return /^com\.cleanyourtv\.manager_.*_all\.ipk$/.test(n)&&a[n+".sha256"]})[0];if(!k)process.exit(1);console.log(a[k]);console.log(a[k+".sha256"])' $T/release.json > $T/assets.txt || die "the release has no package (com.cleanyourtv.manager_<version>_all.ipk with a .sha256 file)"
-    IPKURL=$(sed -n 1p $T/assets.txt); SHAURL=$(sed -n 2p $T/assets.txt)
+    KEY="${CYTV_RELEASE_KEY:-/media/developer/cleanyourtv/release-public.pem}"
+    [ -f "$KEY" ] || die "no trusted release key: copy the maintainer's public key to $KEY first (CYTV_RELEASE_KEY can select a trusted local file)"
+    node -e 'var j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")),a={};(j.assets||[]).forEach(function(x){a[x.name]=x.browser_download_url});var k=Object.keys(a).filter(function(n){return /^com\.cleanyourtv\.manager_\d+\.\d+\.\d+_all\.ipk$/.test(n)&&a[n+".sha256"]&&a[n+".sha256.sig"]})[0];if(!k)process.exit(1);console.log(a[k]);console.log(a[k+".sha256"]);console.log(a[k+".sha256.sig"]);console.log(k)' $T/release.json > $T/assets.txt || die "the release has no signed package"
+    IPKURL=$(sed -n 1p $T/assets.txt); SHAURL=$(sed -n 2p $T/assets.txt); SIGURL=$(sed -n 3p $T/assets.txt); NAME=$(sed -n 4p $T/assets.txt)
     say "downloading $(basename "$IPKURL")"
     curl -fsSL "$IPKURL" -o $T/pkg.ipk || die "download failed"
-    want=$(curl -fsSL "$SHAURL" | awk '{print $1}')
+    curl -fsSL "$SHAURL" -o "$T/checksum" || die "checksum download failed"
+    curl -fsSL "$SIGURL" -o "$T/signature" || die "signature download failed"
+    want=$(node -e 'var fs=require("fs"),c=require("crypto"),a=process.argv.slice(1),b=fs.readFileSync(a[0]),v=c.createVerify("RSA-SHA256");v.update(b);if(!v.verify(fs.readFileSync(a[2]),fs.readFileSync(a[1])))process.exit(1);var m=/^([0-9a-f]{64})  ([^\r\n]+)\n?$/.exec(b.toString());if(!m||m[2]!==a[3])process.exit(1);console.log(m[1])' "$T/checksum" "$T/signature" "$KEY" "$NAME") || die "release signature is not valid; nothing was installed"
     got=$(node -e 'console.log(require("crypto").createHash("sha256").update(require("fs").readFileSync(process.argv[1])).digest("hex"))' $T/pkg.ipk)
     [ -n "$want" ] && [ "$want" = "$got" ] || die "the package does not match its checksum; nothing was installed"
     IPK=$T/pkg.ipk
   fi
 
   # right after a system app manager restart an install can be silently dropped, so check and retry
-  cp "$IPK" /tmp/cytv-manager.ipk
+  cp "$IPK" "$T/install.ipk" || die "could not stage package"
   n=0; ok=0
   while [ $n -lt 4 ]; do
-    luna-send -n 1 -w 30000 -f luna://com.webos.appInstallService/dev/install "{\"id\":\"$ID\",\"ipkUrl\":\"/tmp/cytv-manager.ipk\",\"subscribe\":false}" </dev/null >/dev/null 2>&1
+    luna-send -n 1 -w 30000 -f luna://com.webos.appInstallService/dev/install "{\"id\":\"$ID\",\"ipkUrl\":\"$T/install.ipk\",\"subscribe\":false}" </dev/null >/dev/null 2>&1
     for i in 1 2 3 4 5 6 7 8; do
       sleep 3
       [ -f /media/developer/apps/usr/palm/services/$ID.service/bootstrap.sh ] && luna-send -n 1 -w 5000 -f luna://com.webos.applicationManager/getAppInfo "{\"id\":\"$ID\"}" </dev/null 2>/dev/null | grep -q '"returnValue": true' && { ok=1; break; }
@@ -61,7 +67,7 @@ main() {
     [ $ok = 1 ] && break
     n=$((n+1))
   done
-  rm -f /tmp/cytv-manager.ipk
+  rm -f "$T/install.ipk"
   [ $ok = 1 ] || die "the package did not install (see Troubleshooting in the documentation: https://lasharor.github.io/cleanyourtv-WebOS/troubleshooting/)"
   if [ -n "$SLUG" ]; then mkdir -p /media/developer/cleanyourtv && echo "test-$SLUG" > /media/developer/cleanyourtv/channel; say "the manager app now follows the test builds of $CYTV_BRANCH (Update channel in the manager switches back to the stable releases)."; fi
   say "the CleanYourTV app is installed."

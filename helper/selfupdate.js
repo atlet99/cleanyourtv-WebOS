@@ -6,8 +6,9 @@
 //                                 also restarts the service on the new files. Progress lines end with DONE or ERROR.
 const fs = require('fs'), cp = require('child_process');
 const { fetch, cmp } = require('./manager');
+const signatures = require('./release');
 const D = '/media/developer/cleanyourtv', SVC = '/media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service';
-const DEFAULT_REPO = 'lasharor/cleanyourtv-WebOS', TMP = '/tmp/cytv-self.ipk';
+const DEFAULT_REPO = 'lasharor/cleanyourtv-WebOS';
 const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbin:' + (process.env.PATH || '') });
 const say = m => console.log(m);
 const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) { return d; } };
@@ -23,7 +24,7 @@ async function latest() {
   for (const a of j.assets || []) assets[a.name] = a.browser_download_url;
   for (const n of Object.keys(assets)) {
     const m = /^com\.cleanyourtv\.manager_(\d+\.\d+\.\d+)_all\.ipk$/.exec(n);
-    if (m && assets[n + '.sha256']) return { version: m[1], url: assets[n], shaUrl: assets[n + '.sha256'], name: n };
+    if (m && assets[n + '.sha256']) return { version: m[1], url: assets[n], shaUrl: assets[n + '.sha256'], sigUrl: assets[n + '.sha256.sig'], name: n };
   }
   throw new Error('the latest release has no package with a checksum');
 }
@@ -35,12 +36,16 @@ async function check() {
   catch (e) { console.log(JSON.stringify({ installed: inst, error: String(e.message || e) })); }
 }
 async function install() {
+  let temp = '';
   try {
+    temp = fs.mkdtempSync(require('./security').runtime() + '/selfupdate-');
+    const TMP = temp + '/package.ipk';
     const inst = installedVersion(), l = await latest();
     say('installed ' + inst + ', latest ' + l.version);
     if (cmp(l.version, inst) <= 0) { say('DONE already up to date'); return; }
     say('downloading ' + l.name);
-    const want = (await fetch(l.shaUrl)).toString().trim().split(/\s+/)[0].toLowerCase();
+    if (!l.sigUrl) throw new Error('release has no signature; refusing to install');
+    const want = signatures.verify(await fetch(l.shaUrl), await fetch(l.sigUrl), l.name);
     const got = (await fetch(l.url, TMP)).sha256;
     if (!/^[0-9a-f]{64}$/.test(want) || got !== want) { try { fs.unlinkSync(TMP); } catch (_) {} throw new Error('the package does not match its checksum; nothing was installed'); }
     say('installing ' + l.version);
@@ -58,5 +63,6 @@ async function install() {
     }
     say('DONE updated to ' + l.version + '. Close CleanYourTV and open it again.');
   } catch (e) { say('ERROR ' + String(e.message || e)); process.exitCode = 1; }
+  finally { if (temp) cp.spawnSync('rm', ['-rf', temp]); }
 }
 if (process.argv[2] === 'check') check(); else if (process.argv[2] === 'install') install(); else { console.log('usage: node selfupdate.js check|install'); process.exit(2); }

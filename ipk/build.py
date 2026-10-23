@@ -3,13 +3,17 @@
   com.cleanyourtv.manager_<version>_all.ipk (+ .sha256)   the package: manager app, picker app, notify app, service
   frontend-<version>.tgz (+ .sha256)                      the launcher alone, installed by the manager app
 Run from anywhere: python3 ipk/build.py"""
-import hashlib, io, json, os, re, shutil, sys, tarfile
+import hashlib, io, json, os, re, shutil, subprocess, sys, tarfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, 'dist')
 P = lambda *a: os.path.join(ROOT, *a)
 PKG = 'com.cleanyourtv.manager'
 SERVICE = PKG + '.service'
+PUBLIC_KEY = os.environ.get('CYTV_RELEASE_PUBLIC_KEY', P('release-public.pem'))
+SIGNING_KEY = os.environ.get('CYTV_SIGNING_KEY', '')
+if SIGNING_KEY and not os.path.isfile(PUBLIC_KEY):
+    sys.exit('signing requires CYTV_RELEASE_PUBLIC_KEY (or release-public.pem)')
 
 version = re.search(r"const VERSION = '([^']+)'", open(P('helper', 'helper.js')).read()).group(1)
 fe = json.load(open(P('app', 'version.json')))['version']
@@ -18,6 +22,8 @@ if not re.search(r"VERSION='%s'" % re.escape(fe), open(P('app', 'index.html')).r
 
 FLEXGAP = open(os.path.join(ROOT, 'shared', 'flexgap.js'), 'rb').read()
 def page(body):   # every HTML page gets the flex-gap script for webOS 6 (see shared/flexgap.js)
+    body = re.sub(rb'<script src="(?:\.\./)+shared/(api|i18n)\.js"></script>',
+                  lambda m: b'<script>' + open(P('shared', m[1].decode() + '.js'), 'rb').read() + b'</script>', body)
     i = body.rindex(b'</body>')
     return body[:i] + b'<script>' + FLEXGAP + b'</script>\n' + body[i:]
 
@@ -59,6 +65,9 @@ def write(name, data):
     path = os.path.join(DIST, name)
     open(path, 'wb').write(data)
     open(path + '.sha256', 'w').write('%s  %s\n' % (hashlib.sha256(data).hexdigest(), name))
+    if SIGNING_KEY:
+        subprocess.run(['openssl', 'dgst', '-sha256', '-sign', SIGNING_KEY, '-out', path + '.sha256.sig', path + '.sha256'], check=True)
+        subprocess.run(['openssl', 'dgst', '-sha256', '-verify', PUBLIC_KEY, '-signature', path + '.sha256.sig', path + '.sha256'], check=True)
     print('%-52s %8d bytes' % (name, len(data)))
 
 shutil.rmtree(DIST, ignore_errors=True); os.makedirs(DIST)
@@ -84,6 +93,8 @@ add(data, './usr/palm/applications/com.cleanyourtv.manager/qrcode.js', open(P('t
 s = '.' + '/usr/palm/services/' + SERVICE
 add(data, s + '/bootstrap.sh', open(P('scripts', 'bootstrap.sh'), 'rb').read(), 0o755)
 add_dir(data, s + '/helper', P('helper'))
+add(data, s + '/helper/i18n.js', open(P('shared', 'i18n.js'), 'rb').read())
+if os.path.isfile(PUBLIC_KEY): add(data, s + '/helper/release-public.pem', open(PUBLIC_KEY, 'rb').read())
 add_dir(data, s + '/helper/themes', P('themes'), skip=('README.md',))   # the bundled themes (themes/ in the repository)
 add_dir(data, s + '/scripts', P('scripts'), skip=('bootstrap.sh',))
 add(data, s + '/scripts/uninstall.sh', open(P('uninstall.sh'), 'rb').read(), 0o755)
@@ -108,3 +119,4 @@ ctl = ('Package: %s\nVersion: %s\nSection: misc\nPriority: optional\nArchitectur
        'Maintainer: N/A <nobody@example.com>\nDescription: CleanYourTV for LG webOS\nwebOS-Package-Format-Version: 2\nwebOS-Packager-Version: x.y.x\n' % (PKG, version, size)).encode()
 write('%s_%s_all.ipk' % (PKG, version), ar([('debian-binary', b'2.0\n'), ('control.tar.gz', tgz([('control', ctl, 0o644)], './')), ('data.tar.gz', tgz(data))]))
 print('service %s, launcher %s' % (version, fe))
+if not SIGNING_KEY: print('UNSIGNED development build: automatic installation and updates will refuse it.')

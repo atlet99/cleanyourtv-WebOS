@@ -1,5 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Notification</title>
+<script src="../../shared/api.js"></script><script src="../../shared/i18n.js"></script>
 <style>
 html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:transparent;font-family:"LG Smart UI","Helvetica Neue",Helvetica,Arial,sans-serif;color:#f5f6f8}
 #card{box-sizing:border-box;position:absolute;display:flex;flex-direction:column;gap:20px;width:640px;padding:28px;border-radius:44px;background:rgba(12,13,17,.95);
@@ -42,14 +43,16 @@ function show(){
   var inplace=!!p.kind&&card.classList.contains('on')&&card.className.indexOf('k-')>=0;   // a voice card that is already showing is updated without fading out
   if(!inplace)card.classList.remove('on');
   card.className=(card.classList.contains('on')?'on ':'')+(p.kind?'v k-'+p.kind:'');
-  document.getElementById('title').textContent=p.title||'';document.getElementById('q').textContent=p.question||'';document.getElementById('text').textContent=p.text||'';
+  document.getElementById('title').textContent=p.kind?CYTV_I18N.t(p.title||''):(p.title||'');document.getElementById('q').textContent=p.question||'';document.getElementById('text').textContent=p.kind&&(p.title==='Voice'||p.title==='Not answered')?CYTV_I18N.t(p.text||''):(p.text||'');
+  if(p.imageError)document.getElementById('text').textContent+=(p.text?'\n':'')+CYTV_I18N.t('Image could not be loaded')+': '+CYTV_I18N.t(p.imageError);
   place(p.position||'top-right',!!p.kind);
   clearTimeout(timer);
   timer=setTimeout(function(){card.classList.remove('on');setTimeout(function(){try{window.close()}catch(e){}},500)},Math.max(2,Math.min(120,p.seconds||8))*1000+500);
   if(!p.image){img.style.display='none';img.removeAttribute('src');reveal();return}
   // load the picture first, then show the finished card in one go
   var im=new Image(),done=false,go=function(ok){if(done)return;done=true;if(ok){img.src=p.image;img.style.display='block'}else{img.style.display='none'}reveal()};
-  im.onload=function(){go(true)};im.onerror=function(){go(false)};setTimeout(function(){go(false)},3000);im.src=p.image}
+  im.onload=function(){go(true)};im.onerror=function(){go(false)};setTimeout(function(){go(false)},10000);
+  if(/^http:\/\/127\.0\.0\.1:8765\/api\/notify\/img\?id=\d+$/.test(p.image))CYTV.ready().then(function(){p.image=CYTV.image(p.image);im.src=p.image}).catch(function(){go(false)});else im.src=p.image}
 document.addEventListener('webOSRelaunch',show);
 show();
 </script></body></html>

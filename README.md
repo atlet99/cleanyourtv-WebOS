@@ -37,8 +37,13 @@ sets up, updates and removes everything.
 2. From your computer, with your TV's IP address, install the manager app:
 
    ```sh
-   ssh root@192.168.1.50 'curl -fsSL https://raw.githubusercontent.com/lasharor/cleanyourtv-WebOS/main/install.sh | sh'
+   scp release-public.pem root@192.168.1.50:/home/root/cytv-release-public.pem
+   scp install.sh root@192.168.1.50:/home/root/cytv-install.sh
+   ssh root@192.168.1.50 'CYTV_RELEASE_KEY=/home/root/cytv-release-public.pem sh /home/root/cytv-install.sh'
    ```
+
+   Obtain the maintainer's public key through a trusted channel and review the local installer first.
+   [Signed releases and migration](docs/development/signed-releases.md) explains the required release-key setup.
 
 3. On the TV, open **CleanYourTV**, choose the options and **Set up now**. It takes about a minute and the screen blinks once.
 
@@ -52,7 +57,7 @@ and troubleshooting.
 
 1. **[A launcher that is quick and yours](https://lasharor.github.io/cleanyourtv-WebOS/launcher/).** A dock of four apps, an app
    grid sorted by how often you use each app, top buttons you choose, an Inputs list and a clock; menus in English, Dutch, German,
-   French and Spanish; [themes](https://lasharor.github.io/cleanyourtv-WebOS/themes/) for colours, layout and wallpaper.
+   French, Spanish and Russian; [themes](https://lasharor.github.io/cleanyourtv-WebOS/themes/) for colours, layout and wallpaper.
 
 2. **[Live TV from your own playlist](https://lasharor.github.io/cleanyourtv-WebOS/live-tv/).** Plays an M3U playlist (HLS) with a
    channel list, a programme guide (XMLTV) and number entry. It does not use LG's tuner, and the project provides no channels.
@@ -125,9 +130,9 @@ The pages are built with [Zensical](https://zensical.org) from [docs/](docs/), s
 ## Security
 
 The service runs as root on the TV and listens on `127.0.0.1:8765` only. A few short-lived pages open on the local network on
-request (Live TV pairing, share log, voice setup) and the notification endpoint is off until you switch it on. Everything it
-installs comes from this repository's GitHub releases and carries a SHA-256 file, which detects corruption but **not a compromised
-repository**: download only from this repository's release page. [Security](https://lasharor.github.io/cleanyourtv-WebOS/security/)
+request (Live TV pairing, share log, voice setup) and the notification endpoint is off until you switch it on. The local API
+requires a capability token. Release downloads require a SHA-256 file signed with the maintainer's trusted release key.
+[Security](SECURITY.md)
 covers the ports, the token for notifications, voice and test builds. To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ---

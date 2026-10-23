@@ -1,5 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Home</title>
+<script src="../shared/api.js"></script><script src="../shared/i18n.js"></script>
 <meta name="viewport" content="width=1920">
 <style>
 /* Built for a weak TV GPU: only transform and opacity ever animate; no blur, masks or filters. Everything a theme changes (manager > Theme) is a
@@ -185,7 +186,7 @@ body{background-image:var(--wall);background-size:1920px 1080px}
 <div id="lv"><div id="lv-stage"></div><div id="lv-spin" class="layer"></div><div id="lv-osd" class="layer"><img class="logo" id="lv-ologo" alt=""><div class="num" id="lv-onum"></div><div class="info"><div class="name" id="lv-oname"></div><div class="now" id="lv-onow"></div><div class="next" id="lv-onext"></div><div class="facts" id="lv-ofacts"></div><div class="pbar"><i id="lv-obar"></i></div></div></div><div id="lv-numin" class="layer"></div><div id="lv-guide" class="layer"><div id="lv-glow"></div><div id="lv-gtop"><div id="lv-gtitle"></div><div id="lv-gtabs"></div><input id="lv-search" type="text" autocomplete="off"><div id="lv-gclock"></div></div><div id="lv-rows"></div><div id="lv-detail"></div></div><div id="lv-filter" class="layer"></div><div id="lv-menu" class="layer"></div><div id="lv-msg" class="layer"></div><div id="lv-tune" class="layer"></div><div id="lv-toast" class="layer"></div><div id="lv-stats" class="layer"></div></div>
 <div id="toast"></div>
 <script>
-var API='http://127.0.0.1:8765', CACHE_KEY='cytv.cache.v4', VERSION='1.4.12';
+var API='http://127.0.0.1:8765', CACHE_KEY='cytv.cache.v4', VERSION='1.4.13';
 var DEFAULTS={
   dock:['netflix','youtube.leanback.v4','amazon','com.disney.disneyplus-prod'],
   topbar:[{label:'Inputs',icon:'inputs',action:'inputs'},{label:'Live TV',icon:'tv',action:'live'},{label:'Settings',icon:'settings',app:'com.palm.app.settings'}]
@@ -233,7 +234,7 @@ var TXL={nl:{'Live TV':'Live TV','All channels':'Alle zenders','Loading channels
   "No favourites yet. Press the green button on a channel.":"Aún no hay favoritos. Pulsa el botón verde en un canal.","Nothing watched yet.":"Todavía no has visto nada.","No channels match.":"Ningún canal coincide.",
   "The server refused the stream: it may be blocked in your country or need special request headers.":"El servidor rechaza la emisión: puede estar bloqueada en tu país o necesitar cabeceras especiales.","The stream was not found (404): the channel is offline or its address has changed.":"No se encontró la emisión (404): el canal está fuera de línea o su dirección cambió.","The stream server reported an error.":"El servidor de la emisión informa de un error.","The address answers with a web page, not a video.":"La dirección devuelve una página web, no un vídeo.","This stream is protected by DRM and cannot be played here.":"Esta emisión está protegida con DRM y no se puede reproducir aquí.","The stream server cannot be reached.":"No se puede acceder al servidor de la emisión.","The stream is too slow to start.":"La emisión tarda demasiado en empezar.","The stream answers, but the TV could not play it: probably a format it cannot decode.":"La emisión responde, pero el televisor no pudo reproducirla: probablemente un formato que no sabe decodificar."}};
  for(var l in add){TXL[l]=TXL[l]||{};for(var k in add[l])TXL[l][k]=add[l][k]}})();
-function t(k){var d=TX[LANG],l=TXL[LANG];return (d&&d[k])||(l&&l[k])||k}
+function t(k){if(LANG==='ru')return CYTV_I18N.t(k,'ru');var d=TX[LANG],l=TXL[LANG];return (d&&d[k])||(l&&l[k])||k}
 /* a button's label: built-in buttons are translated, buttons you added keep the app's own name */
 function barLabel(o){return o.action==='inputs'?t('Inputs'):o.app==='com.palm.app.settings'?t('Settings'):o.action==='customize'?t('Customise'):o.action==='live'?t('Live TV'):(o.label||'')}
 function clockOpts(){var c=cfg.clock,o={hour:'numeric',minute:'2-digit'};if(c==='24'){o.hourCycle='h23'}else if(c==='12'){o.hourCycle='h12';o.hour='numeric'}return o}
@@ -242,9 +243,9 @@ var apps=[], cfg={}, usage={}, warned=false, rows=[], r=1, c=0, colors={}, tiles
 function $(id){return document.getElementById(id)}
 var toastT;
 function toast(t){var e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(toastT);toastT=setTimeout(function(){e.classList.remove('on')},4000)}
-var MIN_SERVICE='1.4.3';
+var MIN_SERVICE='1.5.13';
 function oldSvc(v){var a=String(v).split('.'),b=MIN_SERVICE.split('.');for(var i=0;i<3;i++){var x=+a[i]||0,y=+b[i]||0;if(x!==y)return x<y}return false}
-function api(p,body){return fetch(API+p,body?{method:'POST',body:JSON.stringify(body)}:{}).then(function(x){return x.json()})}
+function api(p,body){return CYTV.api(API+p,body)}
 function launch(id,params){if(id==='__live')return LIVE.enter();api('/api/launch',{id:id,params:params}).then(function(x){if(x&&x.returnValue===false)toast(t('Could not open')+' '+id)})}
 function store(){try{localStorage.setItem(CACHE_KEY,JSON.stringify({apps:apps,cfg:cfg,usage:usage,colors:colors}))}catch(e){}}
 function storeSoon(){clearTimeout(saveT);saveT=setTimeout(store,1500)}
@@ -327,7 +328,7 @@ function tile(a){
   i.onload=function(){if(!colors[a.id]){var col=iconColor(i,a.id);d._col=col;paint(d,col);fit(d,!!(d.parentNode&&d.parentNode.id==='dock'));if(!col.t){colors[a.id]=col;storeSoon()}if(rows[r]&&rows[r][c]===d)glowNow(d)}};
   i.onerror=function(){i.remove();var t=document.createElement('div');t.className='t';t.textContent=a.title;d.appendChild(t);
     if(!colors[a.id]){var f=hsl2rgb(hashHue(a.id),.42,.42);paint(d,{c:f,b:hsl2rgb(hashHue(a.id),.4,.2)})}};   /* not remembered: a failed load must not pin a made-up colour */
-  i.src=a.id==='__live'?LIVE_ICON:API+'/icon/'+encodeURIComponent(a.id);d.appendChild(i);if(i.decode)i.decode().catch(function(){});
+  if(a.id==='__live')i.src=LIVE_ICON;else CYTV.ready().then(function(){i.src=CYTV.image(API+'/icon/'+encodeURIComponent(a.id))}).catch(function(){i.onerror()});d.appendChild(i);if(i.decode)i.decode().catch(function(){});
   return d}
 
 /* ---------- ambient glow: two layers cross-fade, updated only once focus settles ---------- */
@@ -347,7 +348,7 @@ function applyTheme(t){
   if(!t||!t.vars){TH=TH0;return}
   for(k in t.vars){st.setProperty(k,t.vars[k]);themeKeys.push(k)}
   var w=t.wallpaper;
-  if(w){var d='rgba('+t.nightRgb+','+w.dim+')';st.setProperty('--wall','linear-gradient('+d+','+d+'),url("'+API+'/api/theme/wallpaper/'+w.file+'")');themeKeys.push('--wall')}
+  if(w){var d='rgba('+t.nightRgb+','+w.dim+')';st.setProperty('--wall','linear-gradient('+d+','+d+'),url("'+CYTV.image(API+'/api/theme/wallpaper/'+w.file)+'")');themeKeys.push('--wall')}
   for(k in t.attrs)b.setAttribute('data-'+k,t.attrs[k]);
   TH={cols:t.cols||10,tileH:t.tileH||151,gapY:t.gapY||26,gt:t.gt||350,viewH:t.viewH||780,dockN:t.dockN||4,overlay:!!t.overlay,overlayH:t.overlayH||510,glow:t.glowRgb||''}}
 

@@ -28,12 +28,15 @@ That is all. The launcher is LG's Home from then on.
 From your computer, with your TV's IP address:
 
 ```sh
-ssh root@192.168.1.50 'curl -fsSL https://raw.githubusercontent.com/lasharor/cleanyourtv-WebOS/main/install.sh | sh'
+scp release-public.pem root@192.168.1.50:/home/root/cytv-release-public.pem
+scp install.sh root@192.168.1.50:/home/root/cytv-install.sh
+ssh root@192.168.1.50 'CYTV_RELEASE_KEY=/home/root/cytv-release-public.pem sh /home/root/cytv-install.sh'
 ```
 
-The script downloads the latest release package, checks its SHA-256 and installs it. Nothing else on the TV changes in this
+Obtain the maintainer's public key through a trusted channel and review the local installer first.
+The script downloads the latest release package, verifies its signature and SHA-256 and installs it. Nothing else on the TV changes in this
 step. The package can also be downloaded from [Releases](https://github.com/lasharor/cleanyourtv-WebOS/releases) and installed
-with the Homebrew Channel or `ares-install`.
+with the Homebrew Channel or `ares-install` after manual verification. See [Signed releases and migration](development/signed-releases.md).
 
 ### 2. Set up, on the TV
 
@@ -52,8 +55,8 @@ The setup:
 4. replaces LG's Home at boot (in RAM) and starts the service;
 5. checks that the new Home came up. If it did not, it removes the boot scripts and restarts the TV with LG's Home.
 
-Its log is `/media/developer/cytv-setup.log`, kept across the restart, with the service log next to it in
-`cytv-setup.log.service`.
+Its log is `/media/developer/cleanyourtv/run/setup.log`, kept across the restart, with the service log next to it in
+`setup.log.service`.
 
 ??? note "The same setup over SSH"
     ```sh

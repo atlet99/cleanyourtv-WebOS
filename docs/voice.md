@@ -20,11 +20,14 @@ code; **Remove voice** deletes everything again.
 
 ## Using it
 
+Shell examples require the local API capability. In each SSH session, first run
+`TOKEN=$(node /media/developer/cleanyourtv/security.js token)`; this is separate from your server's token.
+
 | Step | How |
 |---|---|
 | Choose the button | **Voice** > **Learn the voice button**. Try the remote's microphone button; if the hook does not see it, any spare button works. Then switch **Listen on the voice button** on. |
-| Try without a button | **Voice** > **Try it now**, or `curl -X POST localhost:8765/api/voice/listen` |
-| Send the text to a server | `curl -X POST localhost:8765/api/voice/set -d '{"url":"http://server:port/path","token":"optional"}'` |
+| Try without a button | **Voice** > **Try it now**, or `curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/voice/listen` |
+| Send the text to a server | `curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/voice/set -d '{"url":"http://server:port/path","token":"optional"}'` |
 | Pause LG's voice assistant | **Voice** > **Switch off LG's voice assistant**. It pauses LG's `voiceconductor` process while voice is on, so LG's own screen and its cloud recognition do not start on the same button. A reboot or turning the switch off undoes it. |
 
 On screen a card changes in place while you speak: **Listening** (moving bars), **Recognising** or **Thinking** (dots), then your
@@ -51,8 +54,8 @@ the answers on and off.
 The same from a shell:
 
 ```sh
-curl -X POST localhost:8765/api/voice/set -d '{"llm":{"key":"sk-or-...","model":"openrouter/auto"}}'
-curl -X POST localhost:8765/api/voice/set -d '{"llm":{"enabled":true}}'
+curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/voice/set -d '{"llm":{"key":"sk-or-...","model":"openrouter/auto"}}'
+curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/voice/set -d '{"llm":{"enabled":true}}'
 ```
 
 What you say is sent as text to `openrouter.ai` with the model you chose (a short instruction asks for one to three plain
@@ -63,7 +66,7 @@ as well, the server also receives the text and the model's answer (`{"text","ans
 You can also ask by text, with the same result, and without the speech download:
 
 ```sh
-curl -X POST localhost:8765/api/voice/ask -d '{"text":"..."}'
+curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/voice/ask -d '{"text":"..."}'
 ```
 
 It answers `{"text","answer","error"}`; add `"card":false` to skip the screen.
@@ -115,10 +118,10 @@ conversation starts after ten quiet minutes or after **Forget the conversation**
 The same from a shell:
 
 ```sh
-curl -X POST localhost:8765/api/voice/set -d '{"ha":{"url":"http://homeassistant.local:8123","token":"eyJ..."}}'
-curl -X POST localhost:8765/api/voice/set -d '{"ha":{"route":"ha-only","agent":"conversation.home_assistant","selfSigned":false}}'
-curl -X POST localhost:8765/api/voice/ha-test
-curl -X POST localhost:8765/api/voice/ask -d '{"text":"turn on the living room light"}'
+curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/voice/set -d '{"ha":{"url":"http://homeassistant.local:8123","token":"eyJ..."}}'
+curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/voice/set -d '{"ha":{"route":"ha-only","agent":"conversation.home_assistant","selfSigned":false}}'
+curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/voice/ha-test
+curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/voice/ask -d '{"text":"turn on the living room light"}'
 ```
 
 `route` is `ha-first`, `ha-only` or `ai-only`; `{"ha":{"clear":true}}` removes the address and the token. `/api/voice/ask` answers

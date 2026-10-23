@@ -18,7 +18,17 @@ jobs:
       - name: Service checks under Node 8.12.0 (what webOS 5 ships)
         run: sh tools/node8-check.sh
       - name: Build the package
-        run: CYTV_BUILD="${GITHUB_SHA::7}" python3 ipk/build.py
+        env:
+          CYTV_RELEASE_PRIVATE_KEY: ${{ secrets.CYTV_RELEASE_PRIVATE_KEY }}
+          CYTV_RELEASE_PUBLIC_KEY_PEM: ${{ vars.CYTV_RELEASE_PUBLIC_KEY_PEM }}
+        run: |
+          test -n "$CYTV_RELEASE_PRIVATE_KEY" && test -n "$CYTV_RELEASE_PUBLIC_KEY_PEM" || { echo "Configure the release signing key and public key first"; exit 1; }
+          umask 077
+          keydir=$(mktemp -d)
+          trap 'rm -rf "$keydir"' EXIT
+          printf '%s\n' "$CYTV_RELEASE_PRIVATE_KEY" > "$keydir/private.pem"
+          printf '%s\n' "$CYTV_RELEASE_PUBLIC_KEY_PEM" > "$keydir/public.pem"
+          CYTV_BUILD="${GITHUB_SHA::7}" CYTV_SIGNING_KEY="$keydir/private.pem" CYTV_RELEASE_PUBLIC_KEY="$keydir/public.pem" python3 ipk/build.py
       - name: Publish the test build
         env:
           GH_TOKEN: ${{ github.token }}

@@ -16,7 +16,7 @@ uninstall. Optional features contact other services only when you switch them on
 | `/media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service/` | The installed package contents |
 | `/var/lib/webosbrew/init.d/` | Boot scripts `10-cleanyourtv-home` and, with debloat on, `15-cleanyourtv-debloat` (links into the folder above) |
 | `/home/root/.config/lginputhook/keybinds.json` | Our binds for the Input key (and the voice key); other binds are left alone |
-| `/media/developer/cytv-setup.log` | The setup log |
+| `/media/developer/cleanyourtv/run/setup.log` | The setup log (root-only runtime directory) |
 
 ## At boot
 

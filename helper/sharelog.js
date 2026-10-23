@@ -2,11 +2,11 @@
 // Standalone: collects a diagnostic report and serves it on the local network for ten minutes at an address with a random
 // token, so it can be opened on a phone (the manager app shows the address as a QR code). It does not need the service to
 // be running, so it also works when the setup failed. Addresses, MAC addresses and URL paths are masked in the report.
-// Writes /tmp/cytv-sharelog.json {url, until}. Usage: node sharelog.js
+// Writes run/sharelog.json {url, until}. Usage: node sharelog.js
 const http = require('http'), fs = require('fs'), os = require('os'), cp = require('child_process'), crypto = require('crypto');
 const D = '/media/developer/cleanyourtv', SVC = '/media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service';
-const SETUPLOG = '/media/developer/cytv-setup.log';
-const STATE = '/tmp/cytv-sharelog.json', PIDF = '/tmp/cytv-sharelog.pid', LIFE = 10 * 60 * 1000;
+const R = D + '/run', SETUPLOG = R + '/setup.log';
+const STATE = R + '/sharelog.json', PIDF = R + '/sharelog.pid', LIFE = 10 * 60 * 1000;
 const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbin:' + (process.env.PATH || '') });
 
 const sh = (cmd, ms) => { try { return cp.execSync(cmd, { env: ENV, timeout: ms || 8000, stdio: ['ignore', 'pipe', 'pipe'] }).toString(); } catch (e) { return (e.stdout ? e.stdout.toString() : '') + (e.stderr ? e.stderr.toString() : '') || ('(failed: ' + e.message.split('\n')[0] + ')'); } };
@@ -42,15 +42,15 @@ function report() {
   try { opts = JSON.stringify(JSON.parse(read(D + '/config.json')).options || {}); } catch (_) {}
   sec('Options', opts + '\nDISABLE file: ' + (fs.existsSync(D + '/DISABLE') ? 'yes (LG Home selected)' : 'no'));
   let keys = '{}'; try { keys = JSON.stringify(JSON.parse(read(D + '/config.json')).keys || {}); } catch (_) {}
-  const hl = read('/tmp/lginput-hook-lginput2.log');
+  const hl = read(R + '/lginput-hook-lginput2.log');
   const codes = {}; (hl.match(/uinput_code=\d+/g) || []).forEach(c => { codes[c] = (codes[c] || 0) + 1; });
   sec('Remote keys', 'learned: ' + keys + '\nhook attached: ' + (/InputHook initialized/.test(hl) && /lib_main returned: 0/.test(hl)) + '\nkey codes seen in the hook log: ' + JSON.stringify(codes) + '\n' + hl.split('\n').filter(l => /\[(ERRO|FAIL|WARN)|Resolving|Applying|initialized/.test(l)).slice(0, 8).join('\n'));
-  sec('Service status', sh('curl -s -m 3 http://127.0.0.1:8765/api/manager/status 2>&1').slice(0, 2500) || '(service not answering)');
+  sec('Service status', sh('curl -fsS -m 3 -H "X-CYTV-Token: $(cat ' + D + '/api-token)" http://127.0.0.1:8765/api/manager/status 2>&1').slice(0, 2500) || '(service not answering)');
   sec('Setup log (' + SETUPLOG + ')', read(SETUPLOG, 150));
   sec('Service log saved at the last rollback', read(SETUPLOG + '.service', 80));
   sec('Last update error', read(D + '/last-error.txt'));
-  sec('Service log (last 80 lines)', read('/tmp/cleanyourtv-helper.log', 80));
-  sec('Input hook (last 10 lines)', read('/tmp/lginput-hook-lginput2.log', 10));
+  sec('Service log (last 80 lines)', read(R + '/helper.log', 80));
+  sec('Input hook (last 10 lines)', read(R + '/lginput-hook-lginput2.log', 10));
   return redact(o.join('\n') + '\n').slice(0, 300000);
 }
 
@@ -60,7 +60,8 @@ function lanIp() {
   for (const k of Object.keys(n)) for (const a of n[k]) if (a.family === 'IPv4' && !a.internal) return a.address;
   return '127.0.0.1';
 }
-const page = (text) => '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CleanYourTV report</title>' +
+const i18n = require(fs.existsSync(__dirname + '/i18n.js') ? './i18n' : '../shared/i18n');
+const page = (text, lang) => '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CleanYourTV report</title>' +
   '<style>body{margin:0;padding:16px;font:16px/1.4 -apple-system,Helvetica,Arial,sans-serif;background:#111;color:#eee}h1{font-size:20px;margin:0 0 8px}p{margin:0 0 12px;color:#bbb}' +
   'button{font:inherit;font-weight:600;padding:12px 18px;margin:0 8px 12px 0;border:0;border-radius:10px;background:#f5f6f8;color:#111}textarea{width:100%;height:60vh;box-sizing:border-box;background:#000;color:#ddd;border:1px solid #333;border-radius:8px;padding:10px;font:12px/1.35 ui-monospace,Menlo,monospace}</style></head><body>' +
   '<h1>CleanYourTV report</h1><p>Tap <b>Copy</b>, then paste it into your message. Addresses and URL paths are masked. This page closes ten minutes after it was opened on the TV.</p>' +
@@ -68,15 +69,16 @@ const page = (text) => '<!doctype html><html><head><meta charset="utf-8"><meta n
   '<script>var t=document.getElementById("t");t.value=' + JSON.stringify(text).replace(/</g, '\\u003c') + ';' +
   'document.getElementById("s").onclick=function(){t.focus();t.select();t.setSelectionRange(0,t.value.length)};' +
   'document.getElementById("c").onclick=function(){t.focus();t.select();t.setSelectionRange(0,t.value.length);var ok=false;try{ok=document.execCommand("copy")}catch(e){}' +
-  'document.getElementById("m").textContent=ok?"Copied":"Press and hold the text, then choose Copy"};</script></body></html>';
+  'document.getElementById("m").textContent=ok?' + JSON.stringify(i18n.t('Copied', lang)) + ':' + JSON.stringify(i18n.t('Press and hold the text, then choose Copy', lang)) + '};</script></body></html>';
 
 function main() {
+  require('./security').runtime();
   try { const old = parseInt(fs.readFileSync(PIDF, 'utf8'), 10); if (old) process.kill(old, 'SIGTERM'); } catch (_) {}
   const token = crypto.randomBytes(9).toString('hex');
   let text = 'The report is still being prepared; reload in a few seconds.';
   const srv = http.createServer((req, res) => {
     const u = req.url.split('?')[0];
-    if (u === '/' + token) { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }); return res.end(page(text)); }
+    if (u === '/' + token) { const lang = req.headers['accept-language'] || 'en'; res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }); return res.end(i18n.html(page(text, lang), lang)); }
     if (u === '/' + token + '.txt') { res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }); return res.end(text); }
     res.writeHead(404); res.end();
   });
@@ -92,4 +94,4 @@ function main() {
   });
   srv.listen(port, '0.0.0.0');
 }
-if (process.argv[2] === '--print') process.stdout.write(report()); else main();
+if (require.main === module) { if (process.argv[2] === '--print') process.stdout.write(report()); else main(); }

@@ -2,3 +2,7 @@
 dist/
 site/
 .venv/
+*private*.pem
+*.key
+# Repository checks must remain visible even with a global tools/ ignore.
+!tools/

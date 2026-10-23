@@ -28,16 +28,17 @@ service. Pausing LG's voice assistant sends it SIGSTOP; nothing of LG's is modif
 
 ## Trust
 
-Everything it installs comes from this repository's GitHub releases and runs as root. Releases carry a SHA-256 file,
-which detects corruption but not a compromised repository. Download only from the release page of this repository.
+Everything it installs runs as root. Release downloads require a SHA-256 file and its RSA/SHA-256 signature,
+verified with a previously trusted public key. Unsigned releases are refused. A compromised publishing account
+without the signing key cannot produce an accepted update; compromise of the signing key or signing workflow
+still defeats this protection. See [Signed releases](docs/development/signed-releases.md) for key setup and migration.
 
 ## Test builds
 
 The manager's **Update channel** can follow a test build: a pre-release named `test-<branch>` that GitHub Actions publishes for
 each branch push. It is opt-in and off by default; the stable updater only reads the latest non-pre-release. A test build
-is downloaded over HTTPS from the repository the TV already updates from and checked against the `.sha256` file in the same release,
-so the check protects against a damaged download, not against someone who can publish to the repository (the same is true of
-stable releases, which are not signed yet). The tag name is checked (`test-` and lower-case letters, digits and hyphens) and
+is downloaded over HTTPS and checked against the signed `.sha256` file using the installed trusted key.
+Stable and test updates both require signatures. The tag name is checked (`test-` and lower-case letters, digits and hyphens) and
 the files must be the package and launcher names the updater already expects.
 
 ## Limits to know about
@@ -46,7 +47,10 @@ the files must be the package and launcher names the updater already expects.
   rooted TV.
 - `/media/developer` is world-writable on webOS. The setup removes group and other write access from this project's
   files and keeps the playlist and settings files owner-only, but the parent folder remains writable.
-- The service API refuses requests from web pages (any `http(s)` origin); local apps and scripts are accepted.
+- The service API refuses HTTP(S) origins and requires a local 256-bit capability token for all other requests.
+  `Origin: null` alone does not grant access. Apps obtain the token through the Homebrew Channel, scripts send
+  `X-CYTV-Token`; see [Local API](docs/development/signed-releases.md#local-api).
+- Temporary service files live in a root-only `run` directory. Notification images use standard HTTPS certificate validation.
 
 ## Reporting
 

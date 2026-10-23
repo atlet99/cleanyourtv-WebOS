@@ -45,6 +45,7 @@ rest_command:
   `{"enabled":true,"port":8767,"allow":["192.168.1.0/24"]}` (prefixes /8, /16 and /24 are supported).
 - Requests use **plain HTTP**, so the token is visible to anyone who can watch your network traffic. Keep the TV on a network you trust.
 - Ten wrong tokens lock an address out for ten minutes, and at most 20 notifications a minute are accepted.
-- From a shell on the TV, `POST localhost:8765/api/notify` accepts the same body without a token.
+- From a shell on the TV, `POST localhost:8765/api/notify` accepts the same body with the local `X-CYTV-Token`
+  capability (separate from the LAN notification Bearer token). See [Service API](api.md).
 
 See [Security](security.md#network-notifications).
