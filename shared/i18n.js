@@ -34,7 +34,7 @@
     'Apps':'Приложения', 'Your playlist':'Ваш плейлист', 'Nothing connected':'Нет подключения',
     'Can’t read the inputs. Live TV still works.':'Не удалось получить список входов. Телеканалы остаются доступны.',
     'Back':'Назад', 'Cancel':'Отмена', 'Start':'Начать', 'Skip':'Пропустить', 'Clear':'Сбросить', 'Continue':'Продолжить', 'Try again':'Повторить',
-    'selected':'выбрано', 'selected · {0}':'выбрано · {0}', '{0} · selected':'{0} · выбрано', 'Theme default':'Цвет темы',
+    'selected':'выбрано', 'Theme default':'Цвет темы',
     'Accent colour':'Акцентный цвет', 'Go back to the previous theme':'Вернуть предыдущую тему', 'nothing to go back to':'Предыдущая тема не сохранена',
     'Previous theme restored':'Предыдущая тема восстановлена', 'Accent: theme default':'Акцентный цвет сброшен к цвету темы', 'Accent: {0}':'Акцентный цвет: {0}',
     'Stable releases':'Стабильные версии', 'the latest published release':'Последняя стабильная версия', 'Test: {0}':'Тестовая сборка: {0}', 'build {0}':'сборка {0}',
@@ -198,7 +198,25 @@
     'image server answered {0}':'Сервер изображения вернул HTTP {0}', 'self-signed certificate':'Сервер использует недоверенный самоподписанный сертификат',
     'unable to verify the first certificate':'Не удалось проверить цепочку сертификатов сервера', 'certificate has expired':'Срок действия сертификата сервера истёк',
     'this launcher does not support API authorization':'Эта версия главного экрана не поддерживает защищённый API',
-    'no compatible previous launcher; restarting with LG Home':'Совместимая предыдущая версия не сохранена. После перезагрузки откроется главный экран LG'
+    'no compatible previous launcher; restarting with LG Home':'Совместимая предыдущая версия не сохранена. После перезагрузки откроется главный экран LG',
+    'Dock':'Избранные приложения', 'LG Home':'Главный экран LG', 'No channels':'Каналы не найдены', 'no picture':'Нет изображения',
+    'GEO':'Ограничение по региону', 'NOT 24/7':'Не круглосуточно', 'HEADERS':'Особые HTTP-заголовки',
+    'The service ({0}) is older than this launcher needs: update it in the CleanYourTV manager':'Служба версии {0} устарела для этого главного экрана. Обновите её в приложении CleanYourTV',
+    'per million input tokens':'за миллион входных токенов', '(test build)':'(тестовая сборка)',
+    'Launcher':'Главный экран', 'Service':'Служба', 'Go back to launcher':'Вернуть предыдущий главный экран', 'Update to':'Обновить',
+    'Home Assistant (Assist)':'Home Assistant (Assist)', 'voice':'микрофона', 'heard':'Речь распознана', 'idle':'Ожидание',
+    'Error: {0}':'Ошибка: {0}', 'guide: {0}':'Программа передач: {0}',
+    'the latest release has no package with a checksum':'В последнем выпуске нет пакета с контрольной суммой',
+    'the package does not match its checksum; nothing was installed':'Контрольная сумма пакета не совпала. Установка отменена',
+    'the system refused the install':'Система отказала в установке', 'the new service did not start; the previous files were restored':'Новая служба не запустилась. Предыдущие файлы восстановлены',
+    'voice is not installed':'Голосовой модуль не установлен', 'not a zip file':'Загруженный файл не является ZIP-архивом',
+    'the engine package has an unexpected layout':'Структура пакета распознавания речи не соответствует ожидаемой',
+    'release has no {0}.sha256, refusing to install an unchecked file':'В выпуске нет файла {0}.sha256. Установка без проверки запрещена',
+    'release has no {0}':'В выпуске нет файла {0}', 'release metadata too large':'Размер данных о выпуске превышает допустимый',
+    'that does not look like Home Assistant ({0} was not found)':'Сервер не похож на Home Assistant: путь {0} не найден',
+    'bad request':'Некорректный запрос', 'bad playlist address':'Некорректный адрес плейлиста', 'no such stream':'Поток не найден',
+    'unsafe service directory':'Каталог службы имеет небезопасные права или владельца', 'unsafe API token file':'Файл токена API имеет небезопасный тип, права или владельца',
+    'invalid API token':'Файл токена API повреждён', 'unsafe runtime directory':'Служебный каталог имеет небезопасные права или владельца'
   };
   var HELP = {
     'Launcher':'Главный экран телевизора. Перед обновлением проверяются цифровая подпись выпуска и SHA-256. Если новая версия не запустится, будет восстановлена предыдущая.',
@@ -252,35 +270,58 @@
     'Set up now':'Устанавливает главный экран, добавляет автозапуск и запускает службу. Занимает около минуты, экран один раз мигнёт. При сбое запуска ТВ перезагрузится с главным экраном LG.',
     'Set up anyway':'Прошивка не проверена, а главный экран LG отличается от поддерживаемого варианта. Будет предпринята попытка установки; при сбое запуска восстановится экран LG.'
   };
-  var templates = [], key;
-  for (key in RU) if (/\{\d+\}/.test(key)) {
-    var parts = key.split(/(\{\d+\})/), pattern = '^', indices = [];
-    for (var i = 0; i < parts.length; i++) {
-      if (/^\{\d+\}$/.test(parts[i])) { pattern += '([\\s\\S]+?)'; indices.push(+parts[i].slice(1, -1)); }
-      else pattern += parts[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Add a complete language here. The checker compares every catalogue with tools/i18n-source.json.
+  var catalogs = { ru: { messages: RU, help: HELP } }, templateCache = {};
+  function templatesFor(lang) {
+    if (templateCache[lang]) return templateCache[lang];
+    var messages = catalogs[lang].messages, templates = [], key;
+    for (key in messages) if (/\{\d+\}/.test(key)) {
+      var parts = key.split(/(\{\d+\})/), pattern = '^', indices = [];
+      for (var i = 0; i < parts.length; i++) {
+        if (/^\{\d+\}$/.test(parts[i])) { pattern += '([\\s\\S]+?)'; indices.push(+parts[i].slice(1, -1)); }
+        else pattern += parts[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+      templates.push({ re: new RegExp(pattern + '$'), key: key, value: messages[key], indices: indices });
     }
-    templates.push({ re: new RegExp(pattern + '$'), value: RU[key], indices: indices });
+    // Specific templates precede generic prefixes such as "Launcher {0}".
+    templates.sort(function (a, b) { return b.re.source.length - a.re.source.length; });
+    templateCache[lang] = templates; return templates;
   }
-  // Specific templates precede generic prefixes such as "Launcher {0}".
-  templates.sort(function (a, b) { return b.re.source.length - a.re.source.length; });
-  function language(value) { return String(value || 'en').toLowerCase().slice(0, 2); }
+  function language(value) { return String(value || 'en').trim().toLowerCase().split(/[-_,;]/)[0]; }
   var current = typeof window !== 'undefined' ? language((window.webOSSystem && window.webOSSystem.locale) || navigator.language) : 'en';
   function t(value, lang, depth) {
     var text = String(value == null ? '' : value); lang = language(lang || current); depth = depth || 0;
-    if (lang !== 'ru' || !text || depth > 4) return text;
-    if (Object.prototype.hasOwnProperty.call(RU, text)) return RU[text];
+    if (!catalogs[lang] || !text || depth > 4) return text;
+    var messages = catalogs[lang].messages, templates = templatesFor(lang);
+    if (Object.prototype.hasOwnProperty.call(messages, text)) return messages[text];
     // Formatting is not part of a message key. Preserve it around the translated text.
     var trimmed = text.trim();
     if (trimmed !== text) return text.slice(0, text.indexOf(trimmed)) + t(trimmed, lang, depth + 1) + text.slice(text.indexOf(trimmed) + trimmed.length);
     for (var i = 0; i < templates.length; i++) {
-      var entry = templates[i], match = entry.re.exec(text);
+      var entry = templates[i];
+      // A generic capture must not swallow the next independent line/status.
+      if (/\n| · /.test(text) && !/\n| · /.test(entry.key)) continue;
+      var match = entry.re.exec(text);
       if (match) return entry.value.replace(/\{(\d+)\}/g, function (_, n) { return match[entry.indices.indexOf(+n) + 1]; });
     }
     if (/\n| · /.test(text)) return text.split(/(\n| · )/).map(function (part) { return t(part, lang, depth + 1); }).join('');
     return text;
   }
+  function format(key, values, lang) {
+    return t(key, lang).replace(/\{(\d+)\}/g, function (slot, n) { return values && values[n] !== undefined ? String(values[n]) : slot; });
+  }
+  function error(value, lang, depth) {
+    var text = String(value || ''), wrappers = ['guide: ', 'Install failed: ', 'Update failed: ', 'Could not check: '];
+    depth = depth || 0;
+    if (depth < 4) for (var i = 0; i < wrappers.length; i++) if (text.indexOf(wrappers[i]) === 0) {
+      return format(wrappers[i] + '{0}', [error(text.slice(wrappers[i].length), lang, depth + 1)], lang);
+    }
+    var translated = t(text, lang);
+    // Unknown OS/provider details remain verbatim, with a localised error label.
+    return translated === text && text ? format('Error: {0}', [text], lang) : translated;
+  }
   function html(source, lang) {
-    if (language(lang) !== 'ru') return source;
+    if (!catalogs[language(lang || current)]) return source;
     // Only static markup uses this: script/style bodies, values and URLs are never translated.
     return source.split(/(<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>|<textarea\b[\s\S]*?<\/textarea>|<option\b[\s\S]*?<\/option>|<[^>]+>)/gi).map(function (part) {
       if (/^<(script|style|textarea|option)\b/i.test(part)) return part;
@@ -288,6 +329,6 @@
       return t(part, lang);
     }).join('');
   }
-  var api = { t: t, html: html, language: language, ru: RU, help: current === 'ru' ? HELP : {} };
+  var api = { t: t, format: format, error: error, html: html, language: language, catalogs: catalogs, ru: RU, help: catalogs[current] ? catalogs[current].help : {} };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.CYTV_I18N = api;
 })(this);

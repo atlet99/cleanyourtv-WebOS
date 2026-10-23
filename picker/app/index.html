@@ -46,14 +46,13 @@ var ICON={
   hdmi:'<svg viewBox="0 0 24 24"><path d="M4 8h16v7l-3 3H7l-3-3z"/><path d="M9 11v3M12 11v3M15 11v3"/></svg>',
   tv:'<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 21h8M12 18v3"/></svg>'};
 var TX={
-  ru:{Apps:'Приложения',Inputs:'Источники',Connected:'Подключено',Live:'Телеканалы',LiveSub:'Ваш плейлист',Nothing:'Нет подключения',nohelper:'Не удалось получить список входов. Телеканалы остаются доступны.'},
   nl:{Apps:'Apps',Inputs:'Ingangen',Connected:'Verbonden',Live:'Live TV',LiveSub:'Je afspeellijst',Nothing:'Niets aangesloten',nohelper:'Kan de ingangen niet lezen. Live TV werkt nog.'},
   de:{Apps:'Apps',Inputs:'Eing\u00E4nge',Connected:'Verbunden',Live:'Live-TV',LiveSub:'Deine Playlist',Nothing:'Nichts angeschlossen',nohelper:'Eing\u00E4nge nicht lesbar. Live-TV funktioniert weiter.'},
   fr:{Apps:'Apps',Inputs:'Entr\u00E9es',Connected:'Connect\u00E9',Live:'TV en direct',LiveSub:'Votre playlist',Nothing:'Rien de connect\u00E9',nohelper:'Impossible de lire les entr\u00E9es. La TV en direct fonctionne encore.'},
   es:{Apps:'Apps',Inputs:'Entradas',Connected:'Conectado',Live:'TV en directo',LiveSub:'Tu lista',Nothing:'Nada conectado',nohelper:'No se pueden leer las entradas. La TV en directo sigue funcionando.'}};
 var EN={Apps:'Apps',Inputs:'Inputs',Connected:'Connected',Live:'Live TV',LiveSub:'Your playlist',Nothing:'Nothing connected',nohelper:'Can\u2019t read the inputs. Live TV still works.'};
-var LANG=((window.webOSSystem&&webOSSystem.locale)||navigator.language||'en').slice(0,2);
-function t(k){return (TX[LANG]&&TX[LANG][k])||EN[k]||k}
+var LANG=CYTV_I18N.language((window.webOSSystem&&webOSSystem.locale)||navigator.language||'en');
+function t(k){if(CYTV_I18N.catalogs[LANG])return CYTV_I18N.t(EN[k]||k,LANG);return (TX[LANG]&&TX[LANG][k])||EN[k]||k}
 function $(i){return document.getElementById(i)}
 function call(uri,p){try{var b=new PalmServiceBridge();b.onservicecallback=function(){};b.call(uri,JSON.stringify(p));return true}catch(e){return false}}
 function log(m){CYTV.api(API+'/api/log?m='+encodeURIComponent('picker '+m)).catch(function(){})}

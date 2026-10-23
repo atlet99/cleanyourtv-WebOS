@@ -49,7 +49,7 @@ function rootExec(cmd){return new Promise(function(res){try{var b=new PalmServic
 function rootRun(cmd){return rootExec('umask 077; R=$(node '+SVC+'/helper/security.js run) || exit 1; '+cmd)}
 function launch(id,params){try{var b=new PalmServiceBridge();b.onservicecallback=function(){};b.call('luna://com.webos.applicationManager/launch',JSON.stringify({id:id,params:params||{}}))}catch(e){}}
 function onoff(v){return v?'On':'Off'}
-function banner(text,cls){var b=$('banner');b.textContent=t(text||'');b.className=cls||'';b.style.display=text?'':'none'}
+function banner(text,cls){var b=$('banner');b.textContent=cls==='err'?CYTV_I18N.error(text||''):t(text||'');b.className=cls||'';b.style.display=text?'':'none'}
 
 function push(v){idxStack.push([view,idx]);view=v;idx=0;build();draw()}   // into a screen; pop returns to the row we left
 function pop(){var p=idxStack.pop()||['main',0];view=p[0];idx=p[1];build();draw()}
@@ -162,7 +162,7 @@ function build(){
     var hk=st.inputhook||{},na=hk.hook&&!hk.hook.attached;
     rows.push({label:'Input key opens our Inputs list',sub:na?'not available on this firmware':onoff(st.options.inputKey),fn:function(){opt({inputKey:!st.options.inputKey})}});
     rows.push({label:'Learn the Input key',sub:(st.keys&&st.keys.inputIsDefault)?'default ('+st.keys.input+')':'learned: '+(st.keys&&st.keys.input),fn:function(){openKeys('input')}});
-    rows.push({label:'Learn the Home key',sub:'optional · '+(st.keys&&st.keys.home?'now: '+st.keys.home:'not learned'),fn:function(){openKeys('home')}});
+    rows.push({label:'Learn the Home key',sub:CYTV_I18N.format('optional · {0}',[t(st.keys&&st.keys.home?'now: '+st.keys.home:'not learned')]),fn:function(){openKeys('home')}});
     rows.push({sep:true});
     rows.push({label:'Back',fn:pop});
     return}
@@ -258,14 +258,14 @@ function draw(){
   if(view==='confirm-live-reset'){ui('sub','Remove the playlist?');return}
   if(view==='theme'){ui('sub','Choose how Home looks. The change shows the next time you open Home.');return}
   if(view==='accent'){ui('sub','The colour of the focus ring and highlights');return}
-  if(view==='voice'){var vv=vo||{},ls=vv.last?(vv.last.text?t('Last heard')+': \u201C'+vv.last.text+'\u201D'+(vv.last.ms?' ('+(vv.last.ms/1000).toLocaleString(document.documentElement.lang)+' '+t('s')+')':'')+(vv.last.error?'\n'+t('Not sent')+': '+t(vv.last.error):''):t('Last try')+': '+t(vv.last.state)+(vv.last.error?'\n'+t(vv.last.error):'')):'';
+  if(view==='voice'){var vv=vo||{},ls=vv.last?(vv.last.text?t('Last heard')+': \u201C'+vv.last.text+'\u201D'+(vv.last.ms?' ('+(vv.last.ms/1000).toLocaleString(document.documentElement.lang)+' '+t('s')+')':'')+(vv.last.error?'\n'+t('Not sent')+': '+CYTV_I18N.error(vv.last.error):''):t('Last try')+': '+t(vv.last.state)+(vv.last.error?'\n'+CYTV_I18N.error(vv.last.error):'')):'';
     ui('sub','Voice \u00B7 '+t(vv.engine||'')+(ls?'\n'+t(ls):''));$('sub').style.whiteSpace='pre-line';if(inf){var b2=document.createElement('b');b2.textContent=t(inf.t);ie.appendChild(b2);ie.appendChild(document.createTextNode(inf.d))}return}
   if(view==='keys'){ui('sub',kText);$('sub').style.whiteSpace='pre-line';return}
   if(inf){var b=document.createElement('b');b.textContent=t(inf.t);ie.appendChild(b);ie.appendChild(document.createTextNode(inf.d))}
   if(view==='inputkey'){ui('sub','Input key');return}
   if(view==='confirm-home'||view==='confirm-uninstall'){ui('sub',view==='confirm-uninstall'?'Remove CleanYourTV?':'Switch Home?');return}
   if(!offline&&st){var m=[];m.push(t('Launcher '+st.frontend.version)+' · '+t('service '+st.service.version));
-    if(st.checkError)m.push('Updates: '+st.checkError);else if(st.release)m.push('Latest release '+st.release.version);
+    if(st.checkError)m.push(CYTV_I18N.format('Updates: {0}',[CYTV_I18N.error(st.checkError)]));else if(st.release)m.push('Latest release '+st.release.version);
     ui('sub',m.join('\n'));$('sub').style.whiteSpace='pre-line'}
   else ui('sub',offline?'The service is not running. Set it up to replace LG’s Home, take over the Input key and keep everything up to date.':'');
 }
