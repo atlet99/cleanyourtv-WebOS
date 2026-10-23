@@ -1,5 +1,9 @@
 # Contributing
 
+These contribution instructions apply to **atlet99's fork** of
+[lasharor/cleanyourtv-WebOS](https://github.com/lasharor/cleanyourtv-WebOS), the original webOS project.
+Please direct fork-specific issues and pull requests to this repository. Upstream development is maintained separately.
+
 The code is on [GitHub](https://github.com/atlet99/cleanyourtv-WebOS). Issues and pull requests are welcome, especially
 reports from TVs that are not in the [tested list](../tested-tvs.md).
 

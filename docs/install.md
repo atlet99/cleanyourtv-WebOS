@@ -1,5 +1,9 @@
 # Installing
 
+These instructions are for **atlet99's fork** of
+[lasharor/cleanyourtv-WebOS](https://github.com/lasharor/cleanyourtv-WebOS).
+The linked releases and release-key setup apply to this fork, not to the original project's releases.
+
 ## Quick start
 
 1. Root the TV and install the Homebrew Channel ([rootmy.tv](https://rootmy.tv)).

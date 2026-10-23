@@ -2,6 +2,11 @@
 
 # CleanYourTV for LG webOS
 
+**This repository is an independently maintained fork of [lasharor/cleanyourtv-WebOS](https://github.com/lasharor/cleanyourtv-WebOS).**
+The original webOS implementation is by lasharor and the upstream contributors. This fork is maintained by
+[atlet99](https://github.com/atlet99) and adds Russian localisation, security hardening and its own documentation site.
+Releases and changes published here belong to this fork; they are not official upstream releases.
+
 A fast home screen for rooted LG webOS TVs, with Live TV from your own playlist, an Inputs list on the Input key,
 picture notifications, optional on-device voice recognition and an optional debloat of LG's ads and telemetry.
 
@@ -138,6 +143,9 @@ covers the ports, the token for notifications, voice and test builds. To report 
 ---
 
 ## Contributing
+
+Please report issues specific to this fork here. For the original project, visit
+[lasharor/cleanyourtv-WebOS](https://github.com/lasharor/cleanyourtv-WebOS).
 
 Reports from other TVs are the most useful contribution: open an [issue](https://github.com/atlet99/cleanyourtv-WebOS/issues)
 with the output of **Share log** in the manager app. For code, see [Contributing](https://atlet99.github.io/cleanyourtv-WebOS/development/):
