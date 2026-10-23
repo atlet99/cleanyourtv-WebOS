@@ -1,6 +1,6 @@
 # Contributing
 
-The code is on [GitHub](https://github.com/lasharor/cleanyourtv-WebOS). Issues and pull requests are welcome, especially
+The code is on [GitHub](https://github.com/atlet99/cleanyourtv-WebOS). Issues and pull requests are welcome, especially
 reports from TVs that are not in the [tested list](../tested-tvs.md).
 
 ## Layout
@@ -50,3 +50,18 @@ welcome too: `firmware`, optionally `sdk`, `homeType`, `status` and a `note`.
 
 Push a branch and the workflow publishes a [test build](../managing.md#test-builds) that people can install from the manager app.
 See [Testing and CI](testing.md).
+
+## Documentation site
+
+GitHub Pages publishes this documentation at <https://atlet99.github.io/cleanyourtv-WebOS/>.
+Changes to `docs/`, `zensical.toml` or the documentation workflow on `main` rebuild and deploy the site.
+Pull requests only build it for validation. To publish manually, open **Actions → Documentation → Run workflow** on `main`.
+The Pages source in **Settings → Pages** is **GitHub Actions**; no separate publishing branch is needed.
+
+Local preview uses the same pinned version as CI:
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install zensical==0.0.71
+.venv/bin/zensical serve
+```

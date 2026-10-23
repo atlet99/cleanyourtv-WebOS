@@ -35,7 +35,7 @@ ssh root@192.168.1.50 'CYTV_RELEASE_KEY=/home/root/cytv-release-public.pem sh /h
 
 Obtain the maintainer's public key through a trusted channel and review the local installer first.
 The script downloads the latest release package, verifies its signature and SHA-256 and installs it. Nothing else on the TV changes in this
-step. The package can also be downloaded from [Releases](https://github.com/lasharor/cleanyourtv-WebOS/releases) and installed
+step. The package can also be downloaded from [Releases](https://github.com/atlet99/cleanyourtv-WebOS/releases) and installed
 with the Homebrew Channel or `ares-install` after manual verification. See [Signed releases and migration](development/signed-releases.md).
 
 ### 2. Set up, on the TV
@@ -67,7 +67,7 @@ Its log is `/media/developer/cleanyourtv/run/setup.log`, kept across the restart
 ## Unlisted firmware
 
 The setup matches the TV's firmware against [`compat.json`](https://github.com/lasharor/cleanyourtv-WebOS/blob/main/compat.json)
-(it fetches the newest copy from the repository and falls back to the one in the package). A listed firmware is set up directly.
+(it fetches the newest copy from the update source and falls back to the one in the package). A listed firmware is set up directly.
 For an unlisted firmware the setup continues when LG's Home app is the flutter or web kind, and otherwise stops and offers
 **Set up anyway**. To add a firmware to the list, open an issue with the output of **Share log** ([Troubleshooting](troubleshooting.md)).
 

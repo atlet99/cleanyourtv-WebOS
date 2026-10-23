@@ -3,9 +3,9 @@
 site_name = "CleanYourTV for LG webOS"
 site_description = "A fast home screen for rooted LG webOS TVs, with Live TV from your own playlist, an Inputs list, picture notifications, optional voice and an optional debloat."
 site_author = "CleanYourTV contributors"
-site_url = "https://lasharor.github.io/cleanyourtv-WebOS/"
-repo_url = "https://github.com/lasharor/cleanyourtv-WebOS"
-repo_name = "lasharor/cleanyourtv-WebOS"
+site_url = "https://atlet99.github.io/cleanyourtv-WebOS/"
+repo_url = "https://github.com/atlet99/cleanyourtv-WebOS"
+repo_name = "atlet99/cleanyourtv-WebOS"
 edit_uri = "edit/main/docs/"
 copyright = "MIT licence. Not affiliated with LG Electronics."
 docs_dir = "docs"
@@ -36,6 +36,7 @@ nav = [
   { "Development" = [
     { "Contributing" = "development/index.md" },
     { "Testing and CI" = "development/testing.md" },
+    { "Signed releases" = "development/signed-releases.md" },
     { "Internals" = "development/internals.md" },
   ] },
   { "Credits and licences" = "credits.md" },

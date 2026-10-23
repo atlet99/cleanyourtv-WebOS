@@ -6,7 +6,7 @@ app name, dock and grid, text, effects and a wallpaper. Choose one in the manage
 [![Classic, Midnight, Warm and Bloom](../docs/screenshots/themes-readme.jpg)](../docs/screenshots/themes-readme.jpg)
 
 Each `<id>.json` here is one theme; `wallpapers/` holds the images they use. They are packaged with the service. Every setting a
-theme can use, with its range and default, is in the [Themes page of the documentation](https://lasharor.github.io/cleanyourtv-WebOS/themes/).
+theme can use, with its range and default, is in the [Themes page of the documentation](https://atlet99.github.io/cleanyourtv-WebOS/themes/).
 The pictures are the launcher page rendered in a browser with each theme.
 
 ## Make your own

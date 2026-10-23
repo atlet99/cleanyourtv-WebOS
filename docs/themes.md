@@ -33,18 +33,18 @@ The pictures are the launcher page rendered in a browser with each theme.
 
 Themes live in the repository, so a new one is a pull request:
 
-1. Copy a theme that is close to what you want from [`themes/`](https://github.com/lasharor/cleanyourtv-WebOS/tree/main/themes), for example `classic.json`, to `themes/<id>.json`. The id is lower-case letters, digits and `-`.
+1. Copy a theme that is close to what you want from [`themes/`](https://github.com/atlet99/cleanyourtv-WebOS/tree/main/themes), for example `classic.json`, to `themes/<id>.json`. The id is lower-case letters, digits and `-`.
 2. Change only what you want to change; the rest keeps its default, or the value of the theme named in `"extends"`.
 3. If it uses a wallpaper, add a `.jpg`, `.png` or `.webp` (at most 1.5 MB, 1920 x 1080) to `themes/wallpapers/` and name it in `effects.wallpaper`. A wallpaper must be your own work or under a licence that allows redistribution; say which in the pull request.
 4. Run `node tools/node8-check.js`: it checks every theme file against the schema, and that this page's table is up to date.
-5. Open the pull request with a screenshot if you can. The [themes folder](https://github.com/lasharor/cleanyourtv-WebOS/tree/main/themes) shows how the bundled ones look.
+5. Open the pull request with a screenshot if you can. The [themes folder](https://github.com/atlet99/cleanyourtv-WebOS/tree/main/themes) shows how the bundled ones look.
 
 When you add a setting to the engine, add one row to `SCHEMA` in `helper/theme.js`, read its variable in `app/index.html`, and run
 `node tools/theme-docs.js` to regenerate the table below.
 
 ## Theme files
 
-A theme is a JSON file in [`themes/`](https://github.com/lasharor/cleanyourtv-WebOS/tree/main/themes) of this repository, shipped with the service. Every key is optional.
+A theme is a JSON file in [`themes/`](https://github.com/atlet99/cleanyourtv-WebOS/tree/main/themes) of this repository, shipped with the service. Every key is optional.
 A missing or invalid value keeps the value of the theme named in `"extends"`, or the default, which is the original look, so a
 theme lists only what it changes. Positions and sizes are in pixels on a 1920 x 1080 canvas.
 
