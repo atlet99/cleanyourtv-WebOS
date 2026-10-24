@@ -167,13 +167,18 @@ const xtreamEpg = playlistUrl => {
 const sniffGzip = s => new Promise((resolve, reject) => {
   s.once('readable', () => {
     const first = s.read() || Buffer.alloc(0);
-    const pt = new PassThrough(); pt.write(first);
-    s.on('error', e => pt.destroy(e));
     if (first.length > 1 && first[0] === 0x1f && first[1] === 0x8b) {
-      const gz = zlib.createGunzip(); pt.pipe(gz);
+      const gz = zlib.createGunzip();
+      // errors must reach the exposed stream even after resolve(), or loadEpg would wait forever on a dropped connection
+      const fail = e => gz.destroy(e);
+      s.on('error', fail); s.pipe(gz); gz.write(first);
       resolve(gz);
-    } else resolve(pt);
-    s.pipe(pt);
+    } else {
+      const pt = new PassThrough();
+      s.on('error', e => pt.destroy(e));
+      pt.write(first); s.pipe(pt);
+      resolve(pt);
+    }
   });
   s.on('error', reject);
 });

@@ -41,6 +41,7 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
     if (q.url === '/guide.xml') return r.end(guideXml);
     if (q.url === '/guide.xml.gz') return r.end(zlib.gzipSync(Buffer.from(guideXml)));
     if (q.url === '/guide-hdr.xml.gz') { r.writeHead(200, { 'content-encoding': 'gzip' }); return r.end(zlib.gzipSync(Buffer.from(guideXml))); }
+    if (q.url === '/guide-broken.gz') { r.writeHead(200, { 'content-encoding': 'gzip' }); r.write(zlib.gzipSync(Buffer.from(guideXml)).slice(0, 40)); return setTimeout(() => q.destroy(), 30); }
     r.end(q.method); }).listen(0, '127.0.0.1');
   await new Promise(r => srv.on('listening', r));
   const port = srv.address().port;
@@ -121,6 +122,10 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
   ok(e2.count === 3, 'guide: a .xml.gz source without a gzip content-encoding header loads');
   const e3 = await live.loadEpg('http://127.0.0.1:' + port + '/guide-hdr.xml.gz', chans);
   ok(e3.count === 3, 'guide: a .xml.gz sent with a proper content-encoding header is not decoded twice');
+  const broken = live.loadEpg('http://127.0.0.1:' + port + '/guide-broken.gz', chans);
+  const verdict = await Promise.race([broken.then(() => 'accepted', () => 'rejected'), new Promise(r => setTimeout(() => r('hung'), 3000))]);
+  broken.catch(() => {});
+  ok(verdict === 'rejected', 'guide: a connection dropped mid-gzip rejects instead of hanging the refresh');
   ok(live.xtreamEpg('http://h:8080/get.php?username=u%20x&password=p&type=m3u_plus') === 'http://h:8080/xmltv.php?username=u%20x&password=p',
     'guide: the Xtream guide address is derived from a get.php playlist address');
   ok(live.xtreamEpg('http://h/playlist.m3u') === '' && live.xtreamEpg('http://h/get.php?type=m3u_plus') === '' && live.xtreamEpg('::bad') === '',
