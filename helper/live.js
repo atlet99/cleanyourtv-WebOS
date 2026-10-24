@@ -166,7 +166,8 @@ const xtreamEpg = playlistUrl => {
 // unwraps the header case: sniff the magic bytes instead of trusting either, so a correct header is never decoded twice.
 const sniffGzip = s => new Promise((resolve, reject) => {
   s.once('readable', () => {
-    const first = s.read() || Buffer.alloc(0);
+    let first = s.read() || Buffer.alloc(0);
+    while (first.length < 2) { const more = s.read(); if (!more) break; first = Buffer.concat([first, more]); }   // a 1-byte first chunk must not hide the magic bytes
     if (first.length > 1 && first[0] === 0x1f && first[1] === 0x8b) {
       const gz = zlib.createGunzip();
       // errors must reach the exposed stream even after resolve(), or loadEpg would wait forever on a dropped connection
@@ -192,7 +193,14 @@ async function loadEpg(url, channels) {
     if (n && byNorm[n] === undefined) byNorm[n] = c.id;
     if (i && byNorm[i] === undefined) byNorm[i] = c.id;
   }
-  const idOf = g => (want.has(g) ? g : byNorm[norm(g)] || '');
+  // guides repeat the same ids across programmes: normalise once per distinct id, not once per programme line
+  const seen = {};
+  const idOf = g => {
+    if (want.has(g)) return g;
+    if (seen[g] !== undefined) return seen[g];
+    const r = byNorm[norm(g)] || '';
+    seen[g] = r; return r;
+  };
   const now = Math.floor(Date.now() / 1000), from = now - 3600, to = now + 36 * 3600;
   let buf = '', cur = null, count = 0, byId = {};
   const handle = line => {
