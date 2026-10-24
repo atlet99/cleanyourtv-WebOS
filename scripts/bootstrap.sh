@@ -90,7 +90,7 @@ if [ "$MODE" = install ]; then
   say "TV: ${model:-unknown model}, firmware ${fw:-?}, webOS SDK ${sdk:-?}"
   # the compatibility list: firmware known to work is set up without --force (a newer copy is fetched from the repository when possible)
   mkdir -p $D
-  COMPATREPO=$(cut -d' ' -f1 $D/source 2>/dev/null); [ -n "$COMPATREPO" ] || COMPATREPO=lasharor/cleanyourtv-WebOS
+  COMPATREPO=$(cut -d' ' -f1 $D/source 2>/dev/null); [ -n "$COMPATREPO" ] || COMPATREPO=atlet99/cleanyourtv-WebOS
   curl -fsSL -m 6 "https://raw.githubusercontent.com/$COMPATREPO/main/compat.json" -o "$R/compat.json" 2>/dev/null && node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$R/compat.json" 2>/dev/null && cp "$R/compat.json" $D/compat.json
   COMPATNOTE=$($J compat "$fw" "$sdk" $D/compat.json $S/compat.json)
 

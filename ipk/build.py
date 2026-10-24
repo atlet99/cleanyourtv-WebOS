@@ -16,10 +16,19 @@ SIGNING_KEY = os.environ.get('CYTV_SIGNING_KEY', '')
 if SIGNING_KEY and not os.path.isfile(PUBLIC_KEY):
     sys.exit('signing requires CYTV_RELEASE_PUBLIC_KEY (or release-public.pem)')
 
-version = re.search(r"const VERSION = '([^']+)'", open(P('helper', 'helper.js')).read()).group(1)
-fe = json.load(open(P('app', 'version.json')))['version']
-if not re.search(r"VERSION='%s'" % re.escape(fe), open(P('app', 'index.html')).read()):
-    sys.exit('app/version.json (%s) and VERSION in app/index.html do not match' % fe)
+source_version = re.search(r"const VERSION = '([^']+)'", open(P('helper', 'helper.js')).read()).group(1)
+source_fe = json.load(open(P('app', 'version.json')))['version']
+if not re.search(r"VERSION='%s'" % re.escape(source_fe), open(P('app', 'index.html')).read()):
+    sys.exit('app/version.json (%s) and VERSION in app/index.html do not match' % source_fe)
+release_version = os.environ.get('CYTV_RELEASE_VERSION', '').strip()
+if not release_version:
+    tagged = subprocess.run(['git', 'tag', '--points-at', 'HEAD', '--list', 'v*'], cwd=ROOT, capture_output=True, text=True)
+    versions = [tag[1:] for tag in tagged.stdout.splitlines() if re.fullmatch(r'v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)', tag)]
+    if versions:
+        release_version = max(versions, key=lambda v: tuple(map(int, v.split('.'))))
+if release_version and not re.fullmatch(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)', release_version):
+    sys.exit('CYTV_RELEASE_VERSION must be a stable x.y.z version')
+version, fe = release_version or source_version, release_version or source_fe
 
 FLEXGAP = open(os.path.join(ROOT, 'shared', 'flexgap.js'), 'rb').read()
 def page(body):   # every HTML page gets the flex-gap script for webOS 6 (see shared/flexgap.js)
@@ -27,6 +36,16 @@ def page(body):   # every HTML page gets the flex-gap script for webOS 6 (see sh
                   lambda m: b'<script>' + open(P('shared', m[1].decode() + '.js'), 'rb').read() + b'</script>', body)
     i = body.rindex(b'</body>')
     return body[:i] + b'<script>' + FLEXGAP + b'</script>\n' + body[i:]
+
+def frontend_asset(rel, body):
+    if release_version and rel == 'version.json':
+        info = json.loads(body); info.update(version=fe, minService=version); body = json.dumps(info).encode()
+    if rel == 'index.html':
+        if release_version:
+            body = re.sub(rb"\bVERSION='[^']+'", ("VERSION='" + fe + "'").encode(), body, count=1)
+            body = re.sub(rb"\bMIN_SERVICE='[^']+'", ("MIN_SERVICE='" + version + "'").encode(), body, count=1)
+        body = page(body)
+    return body
 
 # A test build (made by .github/workflows/test-build.yml from a branch) carries the commit it was made from in a BUILD file, in the
 # package and in the launcher, so the manager can tell two builds with the same version number apart.
@@ -46,7 +65,13 @@ def add_dir(files, arc_root, src, mode_for=None, skip=()):
             rel = os.path.relpath(p, src)
             mode = 0o755 if (n.endswith('.sh') or n in ('ezinject', '10-cleanyourtv-home', '15-cleanyourtv-debloat')) else 0o644
             body = open(p, 'rb').read()
-            add(files, arc_root + '/' + rel, page(body) if n == 'index.html' else body, mode)
+            if src == P('app'):
+                body = frontend_asset(rel, body)
+            elif src == P('helper') and rel == 'helper.js' and release_version:
+                body = re.sub(rb"const VERSION = '[^']+'", ("const VERSION = '" + version + "'").encode(), body, count=1)
+            elif n == 'index.html':
+                body = page(body)
+            add(files, arc_root + '/' + rel, body, mode)
 
 def tgz(files):
     b = io.BytesIO()

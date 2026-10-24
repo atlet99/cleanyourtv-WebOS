@@ -38,8 +38,9 @@ sets up, updates and removes everything.
 
 ## Quick start
 
-**CI packages:** every push to `main` builds an IPK in [Actions → Build IPK](https://github.com/atlet99/cleanyourtv-WebOS/actions/workflows/build-ipk.yml).
-Open a successful run and download its **Artifacts → webos-ipk-…** archive. See [CI builds](docs/development/ci-builds.md) for signing and downloads.
+**Packages:** [Releases](https://github.com/atlet99/cleanyourtv-WebOS/releases) contains the stable signed IPKs.
+Pull requests run linters, tests and preview builds; checked application changes merged into `main` automatically receive a version, tag and release.
+See [CI and release setup](docs/development/ci-builds.md) for signing keys, version rules and preview downloads.
 
 1. Root the TV and install the [Homebrew Channel](https://webosbrew.org).
 2. From your computer, with your TV's IP address, install the manager app:

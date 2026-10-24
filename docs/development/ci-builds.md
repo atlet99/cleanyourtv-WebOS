@@ -1,27 +1,53 @@
-# IPK builds in GitHub Actions
+# Checks, automatic releases and IPK builds
 
-These workflows build **atlet99's fork** of [lasharor/cleanyourtv-WebOS](https://github.com/lasharor/cleanyourtv-WebOS).
-Local installation of Python, npm or the webOS SDK is not required to download a CI package.
+These workflows belong to **atlet99's fork** of [lasharor/cleanyourtv-WebOS](https://github.com/lasharor/cleanyourtv-WebOS).
+Users download stable packages from [Releases](https://github.com/atlet99/cleanyourtv-WebOS/releases); no local build tools are needed.
 
-## Every push to main
+## Pull requests
 
-The **Build IPK** workflow (`.github/workflows/build-ipk.yml`) runs on **every push to `main`**, including documentation-only pushes.
-It can also be started from **Actions → Build IPK → Run workflow**. Leave the application directory empty for CleanYourTV.
+**CI** runs on every pull request to `main`. The reusable **Checks** workflow performs:
 
-The workflow:
+1. ESLint correctness checks for service/build JavaScript and the TV's inline ES5 scripts.
+2. Ruff Python checks and actionlint/ShellCheck validation of workflows and CI shell scripts.
+3. Release-planning/publication tests using a temporary Git repository and a fake GitHub API.
+4. The complete service, security and localisation suite on Node.js 8.12.0, matching webOS 5.
+5. Standalone packager tests and a signed multi-app build using disposable test keys, including release-version substitution.
+6. A strict documentation build and upload of unsigned preview IPKs/checksums as `checked-ipk-<sha>` artifacts, retained for seven days.
 
-1. Checks the service, security and localisation on Node.js 8.12.0, matching webOS 5.
-2. Prepares the existing files with `ipk/build.py` and builds the complete IPK with `@atlet99/webos-packager-plugin/core` 2.2.0. Python also creates the standalone launcher archive.
-3. Signs the checksums when both release keys are configured and verifies them during the build.
-4. Verifies SHA-256 checksums and uploads the output as a downloadable artifact.
+PR jobs have read-only repository permissions and no production signing keys. This includes fork PRs.
+They do not publish releases or create tags, and their artifacts are not reused for production signing.
+Enable the successful **CI → checks → Lint, test and build** check in the `main` ruleset after the first run to require it before merging.
+The Release workflow independently requires the same checks even for direct pushes to `main`.
 
-Open [Build IPK](https://github.com/atlet99/cleanyourtv-WebOS/actions/workflows/build-ipk.yml), choose a successful run and download
-**Artifacts → webos-ipk-…**. Unzip the download; the `.ipk` file is the TV package. GitHub artifact downloads require a GitHub login.
-The artifact also contains the launcher archive, checksums and available signatures. Artifacts are retained for **30 days**.
-The run summary contains the artifact link and signing status. Every build records its commit in `BUILD`.
+## After merging into main
 
-This workflow builds artifacts; it does not publish a stable GitHub Release or change the updater's release channel.
-Public end-user downloads that should remain available belong in [Releases](https://github.com/atlet99/cleanyourtv-WebOS/releases).
+**Release** runs on every push to `main`, runs the reusable checks again for that exact commit and publishes only after they succeed.
+The workflow can also be rerun or manually started on `main`.
+
+`tools/release.py` compares application/packaging paths with the latest published stable release:
+
+| Commit convention | Version increment |
+|---|---|
+| `feat:`, `feat(scope):`, `[FEATURE]`, `[ADD]` | Minor |
+| `type!:`, `type(scope)!:`, `BREAKING CHANGE:` footer, `[BREAKING]` | Major |
+| Other changes to application/packaging files, including `fix:` and `[FIX]` | Patch |
+| Documentation/CI-only changes or no remaining code diff | No IPK release |
+
+The highest increment among relevant commits wins. The first release uses the service's current development version as a floor.
+The planner ignores prereleases, produces grouped notes with commit/comparison links, and does not alter tracked source files.
+No npm publishing, Nix job, PAT or bot version commit is required. The normal `GITHUB_TOKEN` with `contents: write` is used only in the release job.
+
+For a releasable change, the job installs the locked **`@atlet99/webos-packager-plugin/core` 2.2.0** in a private temporary directory,
+builds the production files with the planned version, signs and verifies their SHA-256 files, and creates a draft release at the checked commit.
+Only after all six assets are uploaded and verified is the release published as latest, with its `vX.Y.Z` tag.
+It does not depend on a second workflow being triggered by a bot-created tag.
+
+Release runs are serialised. If `main` advances during the build/upload, publication is skipped and a later checked run aggregates
+the remaining changes. Published stable tags/releases are never rewritten. An interrupted upload can reuse this workflow's own matching draft;
+a conflicting existing tag or manual draft reserves that version and causes the planner to select a new patch number.
+Production publication is never tested by contacting GitHub from the regression suite: its API is faked there.
+
+The release job exposes `new_release_published` and `new_release_version` for future downstream jobs.
 
 ## Signing setup
 
@@ -30,106 +56,87 @@ Public end-user downloads that should remain available belong in [Releases](http
 | Actions secret | `CYTV_RELEASE_PRIVATE_KEY` |
 | Actions variable | `CYTV_RELEASE_PUBLIC_KEY_PEM` |
 
-Both contain the PEM contents described in [Signed releases](signed-releases.md). Private keys are written only to a private
-temporary directory on the runner, deleted afterwards and never included in the artifact.
-With neither key configured, the workflow produces an **unsigned development build** that can be installed explicitly with
-Homebrew Channel or `ares-install`; automatic CleanYourTV updates still require signed releases.
-Configuring only one of the two keys fails the build instead of silently downgrading to unsigned output.
+Both contain the PEM contents described in [Signed releases](signed-releases.md).
+Stable releases **require both keys**. Missing/invalid keys fail the release job before a tag or public release is created.
+Private key files are kept only in a private temporary runner directory and deleted after signing.
+CI preview packages use fresh temporary test keys for verification and leave only unsigned preview output.
 
-## Packaging another webOS application
+## Release versions and local reproduction
 
-The reusable composite action lives in `.github/actions/package-webos/` and uses
-[`@atlet99/webos-packager-plugin` 2.2.0](https://www.npmjs.com/package/@atlet99/webos-packager-plugin/v/2.2.0), a fork of
-`@webosbrew/webos-packager-plugin` originally by kitsuned (Andrey Smirnov).
+A stable release has one version for the package, runtime service and frontend.
+`CYTV_RELEASE_VERSION=X.Y.Z` sets that version during asset preparation, including the embedded service constant,
+frontend version JSON, launcher constant and minimum required service. No version changes are committed back to `main`.
+Checking out an exact stable `vX.Y.Z` tag also selects that version automatically.
+An untagged development build keeps the existing service/frontend versions in the source files.
+`BUILD` records the exact checked source commit; updating the version does not change the source commit being released.
 
-All IPK workflows use the public `/core` API, without webpack. `setup.sh` copies the dedicated tooling manifest and lockfile
-into a fresh `$RUNNER_TEMP` directory and runs `npm ci --omit=peer --ignore-scripts` there.
-Nothing is installed globally or added to the TV app's dependencies. Tooling is removed after the workflow/action finishes.
-Node.js 22 is used for build tooling; this does not change the JavaScript runtime shipped on the TV.
+## Manual packages and test channels
 
-For a prepared app inside this checkout, **Run workflow** accepts:
+**Build IPK** (`build-ipk.yml`) remains a manual workflow for local-style packages or another prepared app.
+Download its `webos-ipk-…` artifact from the run; it is retained for 30 days and requires a GitHub login.
+It does not publish a stable release. Without signing keys it can build unsigned development packages.
 
-- `app-directory`: folder containing `appinfo.json`, its `main` page, `icon` and prepared assets;
-- `service-directories`: optional JS service folders, one per line, each with `services.json` and `package.json`.
+**Test build** (`test-build.yml`) is also manual-only. A maintainer can choose a branch and explicitly publish its signed `test-<branch>`
+prerelease for the TV's Update channel. Ordinary branch pushes and pull requests no longer publish prereleases.
 
-Service IDs must start with the app ID followed by a dot, for example `com.example.app.service` for `com.example.app`.
-The generic Action accepts **one app and optional JS services per invocation**; the same library also builds CleanYourTV's multi-app IPK.
-It is a packager: it does not compile an arbitrary app framework,
-generate missing assets, install on a TV or require a connected TV. Source assets are copied verbatim without minification.
-Symbolic links are rejected. This mode produces an IPK and SHA-256 checksum, without a CleanYourTV release signature.
+## Reusable generic packaging Action
 
-### Use the action in another workflow
+`.github/actions/package-webos/` packages one prepared app and optional JS service folders using the same standalone `/core` API.
+Service IDs must start with the app ID followed by a dot. `app-directory` must contain `appinfo.json`, its main page, icon and prepared assets;
+`service-directories` accepts one path per line, each with `services.json` and `package.json`.
 
 ```yaml
-jobs:
-  package:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      # Run your app's own build first if these are not already prepared assets.
-      - uses: atlet99/cleanyourtv-WebOS/.github/actions/package-webos@main
-        id: package
-        with:
-          app-directory: build/app
-          service-directories: |
-            build/service
-          output-directory: dist
-      - uses: actions/upload-artifact@v4
-        with:
-          name: my-webos-app
-          path: |
-            dist/*.ipk
-            dist/*.sha256
+steps:
+  - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+  # Run your app's build first if needed.
+  - uses: ./.github/actions/package-webos
+    id: package
+    with:
+      app-directory: build/app
+      service-directories: |
+        build/service
+      output-directory: dist
+  - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+    with:
+      name: my-webos-app
+      path: |
+        dist/*.ipk
+        dist/*.sha256
 ```
 
-The action output `steps.package.outputs.ipk` is the absolute path to the generated package.
-From this repository's own workflow, use `./.github/actions/package-webos` as shown in `build-ipk.yml`.
+The output `steps.package.outputs.ipk` is the absolute IPK path. In another repository, reference
+`atlet99/cleanyourtv-WebOS/.github/actions/package-webos` at a reviewed full commit SHA instead of a moving branch.
+The library is a fork of `@webosbrew/webos-packager-plugin`, originally by kitsuned (Andrey Smirnov).
 
-## CleanYourTV's multi-app package
+## Tool isolation and pinned Actions
 
-CleanYourTV's package contains **three application namespaces** (manager, input picker and notification window), a root service,
-boot scripts and native helper binaries. The existing Python entry point prepares/inlines those assets and passes a manifest to
-`ipk/pack.cjs`, which uses `IPKBuilder` from `/core` with `primaryApp: com.cleanyourtv.manager`.
-The library generates the IPK container and its internal archives. `ipk/build-ipk.py` is retained as a compatibility command and delegates to the same
-standalone library through the generic packager.
+External Actions are pinned to verified full commit SHAs, with release versions in comments. Their JavaScript runtime is Node 24;
+build tooling uses Node 22, while the TV compatibility suite still uses Node 8.12.0.
+Dependabot proposes Action pin updates through pull requests; they must pass the same checks.
+The pin change does not silently change the project's Node/Python target versions.
 
-Explicit modes preserve executable scripts/binaries as `0755` and the shared library as `0644`.
-CleanYourTV uses fixed nonzero `mtime: 1761000000` for the IPK and standalone launcher; both are byte-reproducible for identical inputs.
-The generic Action preserves source file permission bits, honours `SOURCE_DATE_EPOCH`, and uses the same nonzero timestamp when it is unset.
-Release checksums and signatures are still created and verified by `ipk/build.py`.
+Npm packages are installed with lockfiles into `$RUNNER_TEMP`, with lifecycle scripts disabled. Webpack is not installed.
+Python linters/documentation tools and the pinned actionlint binary also live in runner-temporary directories.
+The TV package contains none of these build dependencies.
 
-## Optional local tooling
+## Optional local checks
 
-CI performs installation automatically. For local packaging/checks, keep dependencies in a dedicated temporary directory:
+CI performs installation automatically. To reproduce packaging locally without global npm installation:
 
 ```sh
 tooling=$(mktemp -d)
 cp .github/actions/package-webos/package.json .github/actions/package-webos/package-lock.json "$tooling/"
 (cd "$tooling" && npm ci --cache "$tooling/npm-cache" --ignore-scripts --omit=peer --no-audit --no-fund)
-NODE_PATH="$tooling/node_modules" python3 ipk/build.py
-# When finished:
+NODE_PATH="$tooling/node_modules" python3 tools/package-check.py
+NODE_PATH="$tooling/node_modules" python3 .github/actions/package-webos/check.py
+python3 tools/release-check.py
 rm -rf "$tooling"
 ```
 
-The tooling manifest pins version **2.2.0**, and the lockfile pins its dependency tree. It is not a runtime dependency of the TV app.
+`ipk/build.py` prepares assets/launcher/signatures; `ipk/pack.cjs` delegates the multi-app IPK container to the library.
+The generic Action and legacy `ipk/build-ipk.py` command use the same core. Explicit modes preserve executables as `0755`, libraries
+as `0644`, and fixed nonzero timestamps keep the packages reproducible. The generic Action also honours `SOURCE_DATE_EPOCH`.
 
-## Local action check (optional)
-
-To check the generic action after installing its tooling into an isolated directory:
-
-```sh
-NODE_PATH=/path/to/isolated/node_modules python3 .github/actions/package-webos/check.py
-```
-
-The check packages an app with and without a service, inspects the archive, verifies UTF-8 assets, explicit permissions/timestamps,
-byte reproducibility, the legacy command and SHA-256, and rejects symbolic links and unrelated service IDs. It never contacts a TV.
-`tools/package-check.py`, with the same `NODE_PATH`, checks the full signed multi-app package and launcher too.
-
-## References
-
-- [LG webOS CLI installation](https://webostv.developer.lge.com/develop/tools/cli-installation): the official package is `@webos-tools/cli`.
-- [LG packaging guide](https://webostv.developer.lge.com/develop/tools/cli-dev-guide#ares-package): `ares-package APP_DIR SERVICE_DIR`, package inspection and service naming.
-- [Current CLI package metadata](https://registry.npmjs.org/@webos-tools%2fcli/latest): CLI 3.2.6 requires Node.js 20 or newer; the older Node 14–16 recommendation on the installation page is not current for this release.
-- [Standalone plugin API](https://github.com/atlet99/webos-packager-plugin): `/core`, multi-app packaging, explicit permissions and reproducible timestamps.
+References: [GitHub CLI release creation](https://cli.github.com/manual/gh_release_create),
+[plugin 2.2.0](https://www.npmjs.com/package/@atlet99/webos-packager-plugin/v/2.2.0),
+[LG packaging guide](https://webostv.developer.lge.com/develop/tools/cli-dev-guide#ares-package).

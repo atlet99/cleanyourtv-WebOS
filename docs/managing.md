@@ -22,8 +22,9 @@ For the first signed version, update the service package first; see [Migration](
 
 ### Test builds
 
-When a change needs to be tried on a TV the maintainer does not have, it is put on a branch. Every push to a branch other than
-`main` builds the package (`.github/workflows/test-build.yml`) and publishes it as a **pre-release** named `test-<branch>`.
+When a change needs to be tried on a TV the maintainer does not have, it is put on a branch. A maintainer can explicitly run
+**Actions → Test build** for that branch to publish a signed **pre-release** named `test-<branch>`.
+Ordinary branch pushes and pull requests only run checks/builds and do not publish prereleases automatically.
 The stable updater never sees pre-releases.
 
 | | |

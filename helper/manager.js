@@ -6,7 +6,7 @@ const signatures = require('./release');
 const D = process.env.CYTV_DIR || '/media/developer/cleanyourtv';   // the environment variables are for tools/node8-check.js
 const SERVICE_DIR = process.env.CYTV_SERVICE_DIR || '/media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service';
 const apiBase = () => process.env.CYTV_API || 'https://api.github.com';
-const DEFAULT_REPO = 'lasharor/cleanyourtv-WebOS';
+const DEFAULT_REPO = 'atlet99/cleanyourtv-WebOS';
 const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbin:' + (process.env.PATH || '') });
 
 const semver = v => String(v || '0').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);

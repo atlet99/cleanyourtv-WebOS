@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
     run('openssl', 'genrsa', '-out', str(private), '2048', stderr=subprocess.DEVNULL)
     run('openssl', 'rsa', '-in', str(private), '-pubout', '-out', str(public), stderr=subprocess.DEVNULL)
     try:
-        env = dict(os.environ, CYTV_SIGNING_KEY=str(private), CYTV_RELEASE_PUBLIC_KEY=str(public))
+        env = dict(os.environ, CYTV_SIGNING_KEY=str(private), CYTV_RELEASE_PUBLIC_KEY=str(public), CYTV_RELEASE_VERSION='9.8.7')
         run('python3', 'ipk/build.py', env=env)
         assets = list((ROOT / 'dist').glob('*.ipk')) + list((ROOT / 'dist').glob('frontend-*.tgz'))
         assert len(assets) == 2
@@ -72,9 +72,18 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
                     assert members[service + 'inputhook/libinputhookpp.so'].mode == 0o644
                     package = json.load(archive.extractfile(members['usr/palm/packages/com.cleanyourtv.manager/packageinfo.json']))
                     assert package['app'] == 'com.cleanyourtv.manager' and package['services'] == ['com.cleanyourtv.manager.service']
+                    assert package['version'] == '9.8.7'
+                    assert b"const VERSION = '9.8.7'" in archive.extractfile(members[service + 'helper/helper.js']).read()
+                    frontend = json.load(archive.extractfile(members[service + 'payload/app/version.json']))
+                    assert frontend['version'] == frontend['minService'] == '9.8.7'
+                    html = archive.extractfile(members[service + 'payload/app/index.html']).read()
+                    assert b"VERSION='9.8.7'" in html and b"MIN_SERVICE='9.8.7'" in html
                     for app in ['manager', 'picker', 'notify']:
                         assert 'usr/palm/applications/com.cleanyourtv.' + app + '/appinfo.json' in members
                     assert not any('node_modules/' in m.name for m in archive.getmembers())
+                else:
+                    frontend = json.load(archive.extractfile(members['app/version.json']))
+                    assert frontend['version'] == frontend['minService'] == '9.8.7'
         checksums = {a.name: hashlib.sha256(a.read_bytes()).digest() for a in assets}
         run('python3', 'ipk/build.py', env=env)
         assert all(hashlib.sha256((ROOT / 'dist' / name).read_bytes()).digest() == value for name, value in checksums.items())
@@ -84,4 +93,5 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
         env = dict(os.environ)
         env.pop('CYTV_SIGNING_KEY', None)
         env.pop('CYTV_RELEASE_PUBLIC_KEY', None)
+        env.pop('CYTV_RELEASE_VERSION', None)
         run('python3', 'ipk/build.py', env=env)

@@ -38,8 +38,10 @@ go to a TV. The mock needs to answer `/api/apps`, `/api/live/*` and `/api/manage
 
 | Workflow | When | What |
 |---|---|---|
-| `test-build.yml` | Every push to a branch other than `main` | Runs the Node 8 checks, builds the package with the commit in a `BUILD` file and publishes it as the pre-release `test-<branch>` |
-| `build-ipk.yml` | Every push to `main`, or manual run | Checks and builds CleanYourTV; uploads downloadable IPK/launcher artifacts. Manual runs can package another prepared app with the isolated plugin |
+| `ci.yml` / `checks.yml` | Pull requests to `main`, or called from Release | ESLint, Ruff, actionlint/ShellCheck, release tests, Node 8 suite, packaging tests and strict docs build; unsigned preview artifacts only |
+| `release.yml` | Push to `main`, or manual run on `main` | Requires checks, selects a semantic version, signs and verifies packages, uploads a draft and publishes it with its tag |
+| `test-build.yml` | Explicit manual run | Builds and publishes a signed pre-release `test-<branch>` for TV testing |
+| `build-ipk.yml` | Manual run | Builds downloadable artifacts; can package another prepared app with the isolated plugin |
 | `localization.yml` | Relevant pushes and pull requests, or manual run | Checks localisation dictionaries and rendering on Node 8.12.0 without release secrets |
 | `docs.yml` | Pushes that touch the documentation | Builds this site; deploys it to GitHub Pages from `main` |
 

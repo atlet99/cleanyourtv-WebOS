@@ -205,7 +205,7 @@ async function askLlm(text) {
   let answer = '', tool = false;
   for (let attempt = 0; attempt < 2 && !answer; attempt++) {
     const messages = [{ role: 'system', content: system + (attempt ? ' You have no tools and cannot search the internet: never call a tool. Answer in plain text from what you know, and say so if it may be out of date.' : '') }].concat(turns);
-    const r = await request(orApi() + '/chat/completions', { authorization: 'Bearer ' + l.key, 'HTTP-Referer': 'https://github.com/lasharor/cleanyourtv-WebOS', 'X-Title': 'CleanYourTV' },
+    const r = await request(orApi() + '/chat/completions', { authorization: 'Bearer ' + l.key, 'HTTP-Referer': 'https://github.com/atlet99/cleanyourtv-WebOS', 'X-Title': 'CleanYourTV' },
       { model: l.model, messages, max_tokens: 500, reasoning: { exclude: true } }, 60000);
     let o = {}; try { o = JSON.parse(r.text); } catch (_) {}
     if (r.status !== 200 || o.error) throw new Error('OpenRouter: ' + String((o.error && (o.error.message || o.error.code)) || 'HTTP ' + r.status).slice(0, 160));

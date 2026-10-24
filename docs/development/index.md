@@ -27,9 +27,9 @@ reports from TVs that are not in the [tested list](../tested-tvs.md).
 
 ## Building
 
-Every push to `main` runs **Build IPK** and uploads the packages to the workflow's **Artifacts** section.
-You can also use **Run workflow** without building locally. See [IPK builds in GitHub Actions](ci-builds.md) for downloads,
-signing and the reusable action for other webOS apps.
+Pull requests run **CI**: linters, tests, documentation and a preview IPK build. A push to `main` runs **Release**, repeats those checks,
+and automatically tags/publishes signed application changes with release notes. **Build IPK** remains available manually.
+See [Checks and releases](ci-builds.md) for version rules, signing and the reusable action for other webOS apps.
 
 ```sh
 NODE_PATH=/path/to/isolated/node_modules python3 ipk/build.py
@@ -37,8 +37,9 @@ NODE_PATH=/path/to/isolated/node_modules python3 ipk/build.py
 
 writes the release files to `dist/`; [optional local tooling setup](ci-builds.md#optional-local-tooling) installs the pinned
 `@atlet99/webos-packager-plugin/core` dependency without webpack. The output is `com.cleanyourtv.manager_<version>_all.ipk`, `frontend-<version>.tgz` and a `.sha256` file for
-each. Attach them to a GitHub release tagged `v<version>`. The **service** version is `VERSION` in `helper/helper.js`; the
-**launcher** version is `app/version.json` and `VERSION` in `app/index.html` (the build refuses to run when they differ).
+each. On an exact stable tag, its version is used automatically for both service and frontend; CI passes the same value through
+`CYTV_RELEASE_VERSION`. Untagged development builds use `VERSION` in `helper/helper.js` and the matching frontend values in
+`app/version.json` / `app/index.html`. The release workflow does not commit version changes back to `main`.
 
 ## Rules of the road
 
