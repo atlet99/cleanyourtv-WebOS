@@ -41,16 +41,17 @@ program started by the root service with its own copy of the C library; it reads
 
 ## Trust
 
-Everything it installs comes from this repository's GitHub releases and runs as root. Releases carry a SHA-256 file, which
-detects corruption but **not a compromised repository**. Download only from the release page of this repository.
+Everything it installs runs as root. Release downloads require a SHA-256 file and its RSA/SHA-256 signature,
+verified with a previously trusted public key. Unsigned releases are refused. The key is not downloaded from
+the release being verified. See [Signed releases and migration](development/signed-releases.md).
+Compromise of the signing key or a workflow allowed to use it still defeats this protection.
 
 ## Test builds
 
 The manager's **Update channel** can follow a test build: a pre-release named `test-<branch>` that GitHub Actions publishes for
 each branch push. It is opt-in and off by default; the stable updater only reads the latest non-pre-release. A test build is
-downloaded over HTTPS from the repository the TV already updates from and checked against the `.sha256` file in the same release,
-so the check protects against a damaged download, not against someone who can publish to the repository (the same is true of
-stable releases, which are not signed yet). The tag name is checked (`test-` and lower-case letters, digits and hyphens) and the
+downloaded over HTTPS and verified against the signed `.sha256` file with the installed trusted key.
+Both stable and test updates require a signature. The tag name is checked (`test-` and lower-case letters, digits and hyphens) and the
 files must be the package and launcher names the updater already expects.
 
 ## Limits to know about
@@ -58,7 +59,9 @@ files must be the package and launcher names the updater already expects.
 - Any app on the TV can already run root commands through the Homebrew Channel; apps are not a security boundary on a rooted TV.
 - `/media/developer` is world-writable on webOS. The setup removes group and other write access from this project's files and
   keeps the playlist and settings files owner-only, but the parent folder remains writable.
-- The service API refuses requests from web pages (any `http(s)` origin); local apps and scripts are accepted.
+- The service API refuses HTTP(S) origins and requires `X-CYTV-Token` for other requests. `Origin: null` alone grants no access.
+  See [Service API](api.md) for authenticated examples.
+- Temporary service files are kept in a root-only `run` directory. HTTPS notification images require a valid certificate.
 
 !!! tip "Move from telnet to SSH"
     A rooted TV often has an unauthenticated telnet server open on the local network. Turn telnet off and SSH on in the
@@ -66,5 +69,5 @@ files must be the package and launcher names the updater already expects.
 
 ## Reporting
 
-Open a private security advisory on the [GitHub repository](https://github.com/lasharor/cleanyourtv-WebOS/security/advisories),
+Open a private security advisory on the [GitHub repository](https://github.com/atlet99/cleanyourtv-WebOS/security/advisories),
 or an issue that does not include exploit details.

@@ -13,7 +13,7 @@ function fetchImage(url, depth = 0) {
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return reject(new Error('image address must be http(s)'));
     if (/^(localhost|127\.|0\.0\.0\.0|\[?::1\]?$)/i.test(u.hostname)) return reject(new Error('image address must not point at the TV itself'));   // not a way to read the service's own pages
     const lib = u.protocol === 'https:' ? https : http;
-    const req = nc.get(lib, u, { timeout: 8000, rejectUnauthorized: false }, res => {
+    const req = nc.get(lib, u, { timeout: 8000 }, res => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) { res.resume(); return resolve(fetchImage(new URL(res.headers.location, u).toString(), depth + 1)); }
       if (res.statusCode !== 200) { res.resume(); return reject(new Error('image server answered ' + res.statusCode)); }
       const b = []; let n = 0;
@@ -39,9 +39,10 @@ async function show(b, internal) {
   const p = { title: String(b.title || '').slice(0, 120), text: String(b.text || '').slice(0, kind ? 1500 : 400),
     seconds: Math.max(2, Math.min(120, +b.seconds || 8)), position: /^(top|middle|bottom)-(left|center|right)$/.test(b.position) ? b.position : (kind ? 'bottom-center' : 'top-right') };
   if (kind) { p.kind = kind; p.question = String(b.question || '').slice(0, 300); }
+  if (kind && b.textKey === 'Done') p.textKey = 'Done';   // generated completion, not an external answer
   if (b.image) {
     try { const id = String(++seq); images.set(id, await fetchImage(String(b.image))); if (images.size > 5) images.delete(images.keys().next().value); p.image = 'http://127.0.0.1:8765/api/notify/img?id=' + id; }
-    catch (e) { p.text = (p.text ? p.text + '\n' : '') + '(image: ' + e.message + ')'; }
+    catch (e) { p.imageError = String(e.message || e).slice(0, 200); }
   }
   if (!p.title && !p.text && !p.image && !kind) return { error: 'nothing to show' };
   return launch(p);

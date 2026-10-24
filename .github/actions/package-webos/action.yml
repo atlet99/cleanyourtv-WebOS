@@ -1,0 +1,41 @@
+name: Package webOS app
+description: Package a prepared webOS application and optional JS services using an isolated webos-packager-plugin installation.
+inputs:
+  app-directory:
+    description: Directory containing appinfo.json and the prepared application files.
+    required: true
+  service-directories:
+    description: Optional JS service directories, one path per line, containing services.json and package.json.
+    default: ""
+  output-directory:
+    description: Destination for the IPK and SHA-256 file.
+    default: dist
+outputs:
+  ipk:
+    description: Absolute path to the generated IPK.
+    value: ${{ steps.package.outputs.ipk }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: "22"
+    - name: Install isolated packaging tools
+      id: tooling
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/setup.sh"
+    - name: Package application
+      id: package
+      shell: bash
+      env:
+        NODE_PATH: ${{ steps.tooling.outputs.directory }}/node_modules
+        WEBOS_APP_DIRECTORY: ${{ inputs.app-directory }}
+        WEBOS_SERVICE_DIRECTORIES: ${{ inputs.service-directories }}
+        WEBOS_OUTPUT_DIRECTORY: ${{ inputs.output-directory }}
+      run: node "$GITHUB_ACTION_PATH/package.cjs"
+    - name: Remove isolated tools
+      if: always() && steps.tooling.outputs.directory != ''
+      shell: bash
+      env:
+        TOOLING_DIRECTORY: ${{ steps.tooling.outputs.directory }}
+      run: rm -rf -- "$TOOLING_DIRECTORY"

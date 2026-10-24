@@ -127,6 +127,11 @@ const fake = (url, method) => { const res = { code: 0, out: '', writeHead(c) { t
   fs.writeFileSync(bf, 'def5678\n'); r = await ask('check', 'POST'); ok(r.j.service.updateTo === '1.5.4', 'another commit of the same version is offered');
   r = await ask('channel', 'POST', { tag: '' }); ok(r.j.channel === '' && r.j.service.updateTo === '1.5.3', 'back on stable after a test build offers the stable release, even an older one');
   fs.unlinkSync(bf); start('1.5.3'); r = await ask('check', 'POST'); ok(r.j.service.updateTo === null, 'stable without a test build installed: no offer at the same version');
+  const previousDir = path.join(process.env.CYTV_DIR, 'app.prev'); fs.mkdirSync(previousDir);
+  fs.writeFileSync(path.join(previousDir, 'version.json'), JSON.stringify({ version: '1.4.12' }));
+  r = await ask('status', 'GET'); ok(r.j.frontend.previous === null, 'rollback does not offer a legacy launcher without authenticated API support');
+  fs.writeFileSync(path.join(previousDir, 'version.json'), JSON.stringify({ version: '1.4.13', apiVersion: 2 }));
+  r = await ask('status', 'GET'); ok(r.j.frontend.previous === '1.4.13', 'rollback offers a previous launcher that supports the authenticated API');
 
   // 7. Live TV is optional: the option is stored and the key binds are refreshed
   let store = {}, ensured = 0;
@@ -148,6 +153,7 @@ const fake = (url, method) => { const res = { code: 0, out: '', writeHead(c) { t
       const reply = (type, speech, code) => send(200, { conversation_id: 'conv-1', response: { response_type: type, data: code ? { code } : {}, speech: { plain: { speech } } } });
       if (o.text === 'turn on the light') return reply('action_done', 'Turned on the light');
       if (o.text === 'quiet') return reply('action_done', '');
+      if (o.text === 'spoken done') return reply('query_answer', 'Done');
       if (o.text === 'slow') return setTimeout(() => reply('query_answer', 'Finally'), 600);
       reply('error', 'Sorry, I couldn\'t understand that', 'no_intent_match');
     });
@@ -171,6 +177,8 @@ const fake = (url, method) => { const res = { code: 0, out: '', writeHead(c) { t
   r = await vask('ask', { text: 'turn on the light', card: false }); ok(r.j.answer === 'Turned on the light' && r.j.via === 'ha', 'Assist answers an understood command');
   r = await vask('ask', { text: 'quiet', card: false }); ok(r.j.answer === 'Done', 'an action without speech shows Done');
   ok(haLog[1].conversation_id === 'conv-1' && !haLog[0].conversation_id, 'the conversation id is passed on to the next request');
+  await vask('ask', { text: 'quiet' }); ok(cards[cards.length - 1].textKey === 'Done', 'generated completion is marked for localisation');
+  await vask('ask', { text: 'spoken done' }); ok(cards[cards.length - 1].text === 'Done' && !cards[cards.length - 1].textKey, 'external answers are not marked for translation even when they match a message key');
   r = await vask('ask', { text: 'slow', card: false }); ok(r.j.answer === 'Finally', 'a slow answer is waited for');
   r = await vask('ask', { text: 'what is love', card: false }); ok(r.j.answer === 'Sorry, I couldn\'t understand that' && r.j.via === 'ha', 'not understood and no AI: Assist\'s own message is shown');
   await vask('set', { llm: { key: 'sk-test', enabled: true } });
@@ -224,6 +232,11 @@ const fake = (url, method) => { const res = { code: 0, out: '', writeHead(c) { t
   const gen = require(path.join(root, 'tools', 'theme-docs.js')), docs = fs.readFileSync(path.join(root, 'docs', 'themes.md'), 'utf8');
   ok(docs.indexOf(gen.table()) >= 0, 'docs/themes.md holds the table generated from the schema (run: node tools/theme-docs.js)');
 
+  for (const check of ['security-check.js', 'i18n-check.js']) {
+    const result = cp.spawnSync(process.execPath, [path.join(root, 'tools', check)], { encoding: 'utf8' });
+    console.log(result.stdout || ''); if (result.stderr) console.error(result.stderr);
+    ok(result.status === 0, check);
+  }
   console.log(failed ? '\n' + failed + ' check(s) failed on Node ' + process.version : '\nall checks passed on Node ' + process.version);
   fs.rmSync ? fs.rmSync(tmp, { recursive: true, force: true }) : cp.spawnSync('rm', ['-rf', tmp]);
   process.exit(failed ? 1 : 0);

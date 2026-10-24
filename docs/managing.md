@@ -3,10 +3,11 @@
 ## Updating
 
 Open **CleanYourTV**. The **launcher** (the home screen) and the **service** (the background part) update separately from the
-latest GitHub release, each checked against its SHA-256 file.
+latest GitHub release, each checked against its signed SHA-256 file with the installed trusted release key.
+For the first signed version, update the service package first; see [Migration](development/signed-releases.md#first-installation-and-migration).
 
 - A launcher that does not start is replaced by the previous one, and a service that does not start by the previous files.
-- **Go back to launcher** returns to the previous launcher version after an update.
+- **Go back to launcher** returns to a compatible saved launcher after an update. Pre-authentication launchers are not offered.
 - Before the setup, the app offers a newer package by itself.
 - Running the [install command](install.md#1-install-the-manager-app) again also updates.
 
@@ -21,19 +22,20 @@ latest GitHub release, each checked against its SHA-256 file.
 
 ### Test builds
 
-When a change needs to be tried on a TV the maintainer does not have, it is put on a branch. Every push to a branch other than
-`main` builds the package (`.github/workflows/test-build.yml`) and publishes it as a **pre-release** named `test-<branch>`.
+When a change needs to be tried on a TV the maintainer does not have, it can be offered as an explicitly published signed
+**pre-release** named `test-<branch>`. Ordinary branch pull requests only run checks/builds and produce preview artifacts;
+the former automatic branch-release workflow has been removed.
 The stable updater never sees pre-releases.
 
 | | |
 |---|---|
 | Choose a test build | **Update channel** lists the test builds (branch, commit, date). Pick one, then install it with the **Launcher** and **Service** rows. |
 | Back to the stable releases | **Update channel** > **Stable releases**. The stable release is offered again, also when it is older than the test build. |
-| Install from scratch | `ssh root@<tv-ip> 'curl -fsSL https://raw.githubusercontent.com/lasharor/cleanyourtv-WebOS/<branch>/install.sh \| CYTV_BRANCH=<branch> sh'`. The manager then follows that branch. |
+| Install from scratch | Follow [Installing](install.md) with a trusted public key and reviewed local installer; add `CYTV_BRANCH=<branch>` to the installer environment. The manager then follows that branch. |
 | Same version number | A test build records its commit in a `BUILD` file, so a newer push of the same version is still offered. |
 
 !!! warning "A test build can be less finished than a release"
-    It is checked against its SHA-256 file like any release, but nobody has signed it. See [Security](security.md#test-builds).
+    Its authenticity is checked with a signature, just like a stable release, but its behaviour may be less tested. See [Security](security.md#test-builds).
 
 ## Switching between LG's Home and the launcher
 

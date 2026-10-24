@@ -218,7 +218,8 @@ function startPairing() {
   stopPairing();
   const code = String(nc.randomInt(100000, 1000000)); let bad = 0;
   const srv = http.createServer((req, res) => {
-    const send = (c, html) => { res.writeHead(c, { 'content-type': 'text/html; charset=utf-8' }); res.end(html); };
+    const i18n = require(fs.existsSync(__dirname + '/i18n.js') ? './i18n' : '../shared/i18n');
+    const send = (c, html) => { res.writeHead(c, { 'content-type': 'text/html; charset=utf-8' }); res.end(i18n.html(html, req.headers['accept-language'])); };
     if (req.method === 'GET') return send(200, page('', false));
     if (req.method === 'POST' && req.url === '/set') {
       let b = ''; req.on('data', c => { b += c; if (b.length > 8192) req.destroy(); });

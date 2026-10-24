@@ -59,6 +59,11 @@ command -v systemctl >/dev/null || die "this TV has no systemd (webOS older than
 node -e '(()=>1)()' >/dev/null 2>&1 || die "this TV's Node.js ($(node -v 2>&1 | head -1)) is too old for the service: CleanYourTV needs a newer webOS and cannot be set up here. Nothing was changed."
 [ -f $S/helper/helper.js ] && [ -f $S/scripts/10-cleanyourtv-home ] || die "the service files are incomplete in $S"
 [ -f $HOME_DIR/appinfo.json ] || die "stock Home app not found at $HOME_DIR"
+umask 022   # copied app pages keep the platform's normal read permissions; secrets use explicit modes
+mkdir -p "$D" || die "could not create service directory"
+[ ! -L "$D" ] || die "service directory must not be a symbolic link"
+chmod go-w "$D" || die "could not secure service directory"
+R=$(node "$S/helper/security.js" run) || die "unsafe service directory"
 if grep -q " $HOME_DIR " /proc/mounts && [ ! -f $D/backup/home-appinfo.orig.json ]; then
   die "Home is already replaced but no backup exists; reboot the TV once, then run this again"
 fi
@@ -85,8 +90,8 @@ if [ "$MODE" = install ]; then
   say "TV: ${model:-unknown model}, firmware ${fw:-?}, webOS SDK ${sdk:-?}"
   # the compatibility list: firmware known to work is set up without --force (a newer copy is fetched from the repository when possible)
   mkdir -p $D
-  COMPATREPO=$(cut -d' ' -f1 $D/source 2>/dev/null); [ -n "$COMPATREPO" ] || COMPATREPO=lasharor/cleanyourtv-WebOS
-  curl -fsSL -m 6 "https://raw.githubusercontent.com/$COMPATREPO/main/compat.json" -o /tmp/cytv-compat.json 2>/dev/null && node -e 'JSON.parse(require("fs").readFileSync("/tmp/cytv-compat.json","utf8"))' 2>/dev/null && cp /tmp/cytv-compat.json $D/compat.json
+  COMPATREPO=$(cut -d' ' -f1 $D/source 2>/dev/null); [ -n "$COMPATREPO" ] || COMPATREPO=atlet99/cleanyourtv-WebOS
+  curl -fsSL -m 6 "https://raw.githubusercontent.com/$COMPATREPO/main/compat.json" -o "$R/compat.json" 2>/dev/null && node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$R/compat.json" 2>/dev/null && cp "$R/compat.json" $D/compat.json
   COMPATNOTE=$($J compat "$fw" "$sdk" $D/compat.json $S/compat.json)
 
   SRCINFO=$D/backup/home-appinfo.orig.json; [ -f "$SRCINFO" ] || SRCINFO=$HOME_DIR/appinfo.json
@@ -111,11 +116,12 @@ mkdir -p $D/backup
 
 # ---- for an update: keep the running version's files so a failed start can be undone ----
 if [ "$MODE" = update ]; then
-  (cd $D && tar czf backup/service-prev.tgz $(ls *.js *.sh 10-cleanyourtv-home 15-cleanyourtv-debloat 2>/dev/null) inputhook 2>/dev/null)
+  (cd $D && tar czf backup/service-prev.tgz $(ls *.js *.sh release-public.pem 10-cleanyourtv-home 15-cleanyourtv-debloat 2>/dev/null) inputhook 2>/dev/null)
 fi
 
 # ---- copy the service files ----
 cp $S/helper/*.js $D/
+[ ! -f "$S/helper/release-public.pem" ] || cp "$S/helper/release-public.pem" "$D/release-public.pem"
 if [ -f $S/BUILD ]; then cp $S/BUILD $D/BUILD; else rm -f $D/BUILD; fi   # the commit of a test build
 cp $S/scripts/* $D/
 mkdir -p $D/inputhook && cp $S/inputhook/* $D/inputhook/ && chmod 755 $D/inputhook/ezinject
@@ -157,7 +163,7 @@ if [ "$MODE" = update ]; then
   ok=0
   for i in $(seq 1 15); do
     sleep 3
-    hv=$(curl -s -m 3 http://127.0.0.1:8765/api/version | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+    hv=$(curl -fsS -m 3 -H "X-CYTV-Token: $(node "$D/security.js" token)" http://127.0.0.1:8765/api/version | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
     [ "$hv" = "$WANT" ] && { ok=1; break; }
   done
   if [ $ok = 0 ]; then
@@ -189,17 +195,17 @@ if [ $VERIFY = 1 ]; then
   for i in $(seq 1 40); do
     sleep 3
     type=$(luna com.webos.applicationManager/getAppInfo '{"id":"com.webos.app.home"}' | sed -n 's/.*"type": *"\([^"]*\)".*/\1/p' | head -1)
-    hv=$(curl -s -m 3 http://127.0.0.1:8765/api/version | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+    hv=$(curl -fsS -m 3 -H "X-CYTV-Token: $(node "$D/security.js" token)" http://127.0.0.1:8765/api/version | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
     if [ "$type" = web ] && [ "$hv" = "$VERSION" ]; then ok=1; break; fi
   done
   if [ $ok = 0 ]; then
     warn "the new Home did not come up (app type: ${type:-none}, service: ${hv:-not answering}); rolling back"
     # restoring LG's Home live does not always work; without the boot scripts a restart brings it back
-    cp /tmp/cleanyourtv-helper.log /media/developer/cytv-setup.log.service 2>/dev/null
+    cp "$R/helper.log" "$R/setup.log.service" 2>/dev/null
     rm -f $INITD/10-cleanyourtv-home $INITD/15-cleanyourtv-debloat
     echo '{"lastAppId":"com.webos.app.home"}' > /var/luna/preferences/bootd_last_foreground_app_id.json 2>/dev/null
     (sleep 4; reboot) </dev/null >/dev/null 2>&1 &
-    die "rolled back: the boot scripts are removed and the TV restarts with LG's Home. Details: /media/developer/cytv-setup.log and cytv-setup.log.service"
+    die "rolled back: the boot scripts are removed and the TV restarts with LG's Home. Details: /media/developer/cleanyourtv/run/setup.log and setup.log.service"
   fi
 fi
 ensure_apps

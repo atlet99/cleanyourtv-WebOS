@@ -78,5 +78,5 @@ Settings are stored on the TV in `/media/developer/cleanyourtv/config.json`:
 | `sort` | `usage` or `alpha`. |
 | `clock` | `auto`, `12` or `24`. |
 
-See [`config.example.json`](https://github.com/lasharor/cleanyourtv-WebOS/blob/main/config.example.json). Change settings in
+See [`config.example.json`](https://github.com/atlet99/cleanyourtv-WebOS/blob/main/config.example.json). Change settings in
 the launcher; the file is read and written by the service.

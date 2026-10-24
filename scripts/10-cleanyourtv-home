@@ -4,7 +4,10 @@
 export PATH=/usr/bin:/usr/sbin:/bin:/sbin:$PATH
 L=/media/developer/cleanyourtv
 H=/usr/palm/applications/com.webos.app.home
-pgrep -f cleanyourtv/helper.js >/dev/null || (nohup node $L/helper.js >/tmp/cleanyourtv-helper.log 2>&1 </dev/null &)
+umask 077
+R=$(node "$L/security.js" run) || exit 1
+TOKEN=$(node "$L/security.js" token) || exit 1
+pgrep -f cleanyourtv/helper.js >/dev/null || (nohup node $L/helper.js >"$R/helper.log" 2>&1 </dev/null &)
 [ -e $L/DISABLE ] && exit 0   # LG's Home is selected: only the service runs (manager, Input key picker)
 sh $L/stage-home.sh
 if grep -q " $H " /proc/mounts; then
@@ -31,8 +34,8 @@ mount --bind $L/home-overlay $H && { (sleep 3; pkill -9 -f /usr/palm/application
   bad=0
   while grep -q " $H " /proc/mounts; do
     sleep 10
-    if curl -s -m 3 -o /dev/null http://127.0.0.1:8765/api/foreground; then bad=0; else
-      pgrep -f cleanyourtv/helper.js >/dev/null || (nohup node $L/helper.js >/tmp/cleanyourtv-helper.log 2>&1 </dev/null &)
+    if curl -fsS -m 3 -H "X-CYTV-Token: $TOKEN" -o /dev/null http://127.0.0.1:8765/api/foreground; then bad=0; else
+      pgrep -f cleanyourtv/helper.js >/dev/null || (nohup node $L/helper.js >"$R/helper.log" 2>&1 </dev/null &)
       bad=$((bad+1)); [ $bad -ge 6 ] && { sh $L/undo-home.sh temp; break; }
     fi
   done

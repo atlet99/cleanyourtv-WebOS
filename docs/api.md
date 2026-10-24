@@ -4,8 +4,8 @@ The service runs as root on `127.0.0.1:8765` and answers JSON. It is what the la
 you can call it from a shell on the TV (for example over SSH).
 
 !!! note "Who may call it"
-    Requests from web pages with an `http(s)` origin are refused, so a page opened in the TV's browser cannot drive the service.
-    Local apps and scripts (no `Origin` header) are accepted.
+    HTTP(S) origins are refused. All other requests need `X-CYTV-Token`; neither `Origin: null` nor an absent Origin
+    authorizes a request. Apps obtain the token through the Homebrew Channel. See [Local API access](development/signed-releases.md#local-api).
 
 | Endpoint | Purpose |
 |---|---|
@@ -22,14 +22,15 @@ you can call it from a shell on the TV (for example over SSH).
 ## Examples
 
 ```sh
+TOKEN=$(node /media/developer/cleanyourtv/security.js token)
 # launch an app
-curl -X POST localhost:8765/api/launch -d '{"id":"com.palm.app.settings"}'
+curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/launch -d '{"id":"com.palm.app.settings"}'
 
-# show a picture notification without a token (from the TV itself)
-curl -X POST localhost:8765/api/notify -d '{"title":"Hello","text":"From a shell","seconds":8}'
+# show a picture notification from the TV (local API capability, not the network notification token)
+curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/notify -d '{"title":"Hello","text":"From a shell","seconds":8}'
 
 # the service version and updates
-curl -s localhost:8765/api/manager/status
+curl -s -H "X-CYTV-Token: $TOKEN" localhost:8765/api/manager/status
 ```
 
 See the pages for [Live TV](live-tv.md), [Picture notifications](notifications.md) and [Voice](voice.md) for their bodies.

@@ -18,7 +18,8 @@ The page closes by itself. It is open for ten minutes at most and only with the 
 From a shell on the TV instead:
 
 ```sh
-curl -X POST localhost:8765/api/live/settings -d '{"playlistUrl":"http://...","epgUrl":"http://..."}'
+TOKEN=$(node /media/developer/cleanyourtv/security.js token)
+curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/live/settings -d '{"playlistUrl":"http://...","epgUrl":"http://..."}'
 ```
 
 ## Turning it off
@@ -74,7 +75,8 @@ The playlist address, which usually contains an access key, is stored only on th
 `/media/developer/cleanyourtv/live/`, readable by root only. To clear it:
 
 ```sh
-curl -X POST localhost:8765/api/live/reset
+TOKEN=$(node /media/developer/cleanyourtv/security.js token)
+curl -H "X-CYTV-Token: $TOKEN" -X POST localhost:8765/api/live/reset
 ```
 
 Favourites, recent channels and the failed-channel list are stored in `state.json` in the same folder.

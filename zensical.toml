@@ -1,13 +1,13 @@
 # Documentation site (https://zensical.org). Build locally: pip install zensical && zensical serve
 [project]
-site_name = "CleanYourTV for LG webOS"
-site_description = "A fast home screen for rooted LG webOS TVs, with Live TV from your own playlist, an Inputs list, picture notifications, optional voice and an optional debloat."
-site_author = "CleanYourTV contributors"
-site_url = "https://lasharor.github.io/cleanyourtv-WebOS/"
-repo_url = "https://github.com/lasharor/cleanyourtv-WebOS"
-repo_name = "lasharor/cleanyourtv-WebOS"
+site_name = "CleanYourTV for LG webOS — atlet99 fork"
+site_description = "atlet99's independent fork of lasharor/cleanyourtv-WebOS: a fast home screen for rooted LG webOS TVs, with Russian localisation and security hardening."
+site_author = "lasharor and upstream contributors; fork maintained by atlet99"
+site_url = "https://atlet99.github.io/cleanyourtv-WebOS/"
+repo_url = "https://github.com/atlet99/cleanyourtv-WebOS"
+repo_name = "atlet99/cleanyourtv-WebOS"
 edit_uri = "edit/main/docs/"
-copyright = "MIT licence. Not affiliated with LG Electronics."
+copyright = "Fork maintained by atlet99. Original webOS project by lasharor and contributors. MIT licence. Not affiliated with LG Electronics."
 docs_dir = "docs"
 site_dir = "site"
 extra_css = ["stylesheets/extra.css"]
@@ -36,6 +36,9 @@ nav = [
   { "Development" = [
     { "Contributing" = "development/index.md" },
     { "Testing and CI" = "development/testing.md" },
+    { "IPK builds in GitHub Actions" = "development/ci-builds.md" },
+    { "Localisation" = "development/localization.md" },
+    { "Signed releases" = "development/signed-releases.md" },
     { "Internals" = "development/internals.md" },
   ] },
   { "Credits and licences" = "credits.md" },

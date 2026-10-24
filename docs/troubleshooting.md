@@ -18,6 +18,6 @@
 
 ## Reporting a problem
 
-Open an [issue](https://github.com/lasharor/cleanyourtv-WebOS/issues) and attach the output of **Share log**
+Open an [issue](https://github.com/atlet99/cleanyourtv-WebOS/issues) and attach the output of **Share log**
 (manager app, see [The manager app](manager.md#share-log)). It is masked, so it does not contain your addresses or keys. Say which
 TV and firmware you have and what you expected.

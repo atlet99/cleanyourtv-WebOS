@@ -2,10 +2,11 @@
 // options, and restoring LG's Home. Used by the CleanYourTV manager app on the TV.
 const fs = require('fs'), path = require('path'), cp = require('child_process'), crypto = require('crypto'), https = require('https'), http = require('http');
 const nc = require('./netcompat'), { URL, URLSearchParams } = nc;
+const signatures = require('./release');
 const D = process.env.CYTV_DIR || '/media/developer/cleanyourtv';   // the environment variables are for tools/node8-check.js
 const SERVICE_DIR = process.env.CYTV_SERVICE_DIR || '/media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service';
 const apiBase = () => process.env.CYTV_API || 'https://api.github.com';
-const DEFAULT_REPO = 'lasharor/cleanyourtv-WebOS';
+const DEFAULT_REPO = 'atlet99/cleanyourtv-WebOS';
 const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbin:' + (process.env.PATH || '') });
 
 const semver = v => String(v || '0').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
@@ -23,8 +24,9 @@ function fetch(url, file, hops) {
     const req = nc.get(mod, url, { headers: { 'User-Agent': 'cleanyourtv-manager', Accept: file ? 'application/octet-stream, */*' : 'application/vnd.github+json, application/json, */*' }, timeout: 20000 }, res => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) { res.resume(); return resolve(fetch(new URL(res.headers.location, url).toString(), file, (hops || 0) + 1)); }
       if (res.statusCode !== 200) { res.resume(); return reject(new Error('HTTP ' + res.statusCode)); }
-      if (!file) { const b = []; res.on('data', c => b.push(c)); res.on('end', () => resolve(Buffer.concat(b))); return; }
-      const h = crypto.createHash('sha256'), w = fs.createWriteStream(file);
+      res.on('error', reject);
+      if (!file) { const b = []; let size = 0; res.on('data', c => { size += c.length; if (size > 4 << 20) req.destroy(new Error('release metadata too large')); else b.push(c); }); res.on('end', () => resolve(Buffer.concat(b))); return; }
+      const h = crypto.createHash('sha256'), w = fs.createWriteStream(file, { flags: 'wx', mode: 0o600 });
       res.on('data', c => h.update(c)); res.pipe(w);
       w.on('finish', () => resolve({ sha256: h.digest('hex') })); w.on('error', reject);
     });
@@ -94,7 +96,7 @@ function create(ctx) {
     return release;
   }
   const frontendInfo = () => readJson(D + '/app/version.json', {});
-  const prevInfo = () => readJson(D + '/app.prev/version.json', null);
+  const prevInfo = () => { const info = readJson(D + '/app.prev/version.json', null); return info && info.apiVersion === 2 ? info : null; };
   const options = () => Object.assign({ debloat: true, inputKey: true, liveTv: true }, readConf().options || {});
 
   function status() {
@@ -111,11 +113,11 @@ function create(ctx) {
   }
 
   async function download(name, ver, dest) {
-    const url = release.assets[name], shaUrl = release.assets[name + '.sha256'];
+    const url = release.assets[name], shaUrl = release.assets[name + '.sha256'], sigUrl = release.assets[name + '.sha256.sig'];
     if (!url) throw new Error('release has no ' + name);
     if (!shaUrl) throw new Error('release has no ' + name + '.sha256, refusing to install an unchecked file');
-    const want = (await fetch(shaUrl)).toString().trim().split(/\s+/)[0].toLowerCase();
-    if (!/^[0-9a-f]{64}$/.test(want)) throw new Error('bad checksum file');
+    if (!sigUrl) throw new Error('release has no signature; refusing to install');
+    const want = signatures.verify(await fetch(shaUrl), await fetch(sigUrl), name);
     const got = (await fetch(url, dest)).sha256;
     if (got !== want) { try { fs.unlinkSync(dest); } catch (_) {} throw new Error('checksum mismatch'); }
   }
@@ -135,11 +137,11 @@ function create(ctx) {
 
   async function updateFrontend(ver) {
     setJob('working', 'Downloading launcher ' + ver);
-    const T = D + '/tmp-frontend';
+    let T = '';
     try {
+      T = fs.mkdtempSync(require('./security').runtime() + '/frontend-');
       if (!release || release.frontend !== ver) await check();
       if (!release || release.frontend !== ver) throw new Error('launcher ' + ver + ' is not in the latest release');
-      await sh('rm -rf ' + T + ' && mkdir -p ' + T);
       await download('frontend-' + ver + '.tgz', ver, T + '/f.tgz');
       setJob('working', 'Checking the download');
       const lst = await sh('tar tzf ' + T + '/f.tgz');
@@ -149,6 +151,7 @@ function create(ctx) {
       if (!(await sh('cd ' + T + ' && tar xzf f.tgz')).ok) throw new Error('could not unpack');
       const nv = readJson(T + '/app/version.json', {});
       if (nv.version !== ver || !fs.existsSync(T + '/app/index.html')) throw new Error('the download is not launcher ' + ver);
+      if (nv.apiVersion !== 2) throw new Error('this launcher does not support API authorization');
       if (nv.minService && cmp(VERSION, nv.minService) < 0) throw new Error('needs service ' + nv.minService + ' or newer; update the service first');
       setJob('working', 'Installing launcher ' + ver);
       frontendOk = null;
@@ -157,12 +160,13 @@ function create(ctx) {
       setJob('working', 'Checking that the new launcher starts');
       if (!(await waitFrontend(ver, 40000))) {
         setJob('working', 'The new launcher did not start; rolling back');
+        if (!prevInfo()) { setHome(false); throw new Error('no compatible previous launcher; restarting with LG Home'); }
         await swapBack();
         throw new Error('the new launcher did not start; the previous version is back');
       }
       setJob('done', 'Launcher ' + ver + ' installed');
     } catch (e) { setJob('error', String(e.message || e)); }
-    await sh('rm -rf ' + T);
+    if (T) await sh('rm -rf ' + T);
   }
   async function swapBack() {
     await sh('rm -rf ' + D + '/app.next && mv ' + D + '/app ' + D + '/app.next && mv ' + D + '/app.prev ' + D + '/app && mv ' + D + '/app.next ' + D + '/app.prev && sh ' + D + '/stage-home.sh');
@@ -176,8 +180,10 @@ function create(ctx) {
 
   async function updateService(ver) {
     setJob('working', 'Downloading service ' + ver);
-    const f = D + '/tmp-service.ipk', name = 'com.cleanyourtv.manager_' + ver + '_all.ipk';
+    let T = '';
     try {
+      T = fs.mkdtempSync(require('./security').runtime() + '/service-');
+      const f = T + '/package.ipk', name = 'com.cleanyourtv.manager_' + ver + '_all.ipk';
       if (!release || release.service !== ver) await check();
       if (!release || release.service !== ver) throw new Error('service ' + ver + ' is not in the latest release');
       await download(name, ver, f);
@@ -200,7 +206,8 @@ function create(ctx) {
       if (!ok) throw new Error('the install did not finish');
       setJob('working', 'Restarting the service');
       cp.spawn('/bin/sh', ['-c', 'sleep 1; sh ' + SERVICE_DIR + '/bootstrap.sh update ' + ver], { env: ENV, detached: true, stdio: 'ignore' }).unref();
-    } catch (e) { setJob('error', String(e.message || e)); try { fs.unlinkSync(f); } catch (_) {} }
+    } catch (e) { setJob('error', String(e.message || e)); }
+    if (T) await sh('rm -rf ' + T);
   }
 
   async function setOptions(o) {

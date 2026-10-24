@@ -1,0 +1,80 @@
+name: Checks
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  validate:
+    name: Lint, test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install isolated linters and documentation tools
+        env:
+          PIP_CACHE_DIR: ${{ runner.temp }}/pip-cache
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/lint-tools"
+          cp .github/ci/package.json .github/ci/package-lock.json "$RUNNER_TEMP/lint-tools/"
+          (cd "$RUNNER_TEMP/lint-tools" && npm ci --cache "$RUNNER_TEMP/npm-lint-cache" --ignore-scripts --no-audit --no-fund)
+          python -m venv "$RUNNER_TEMP/python-ci"
+          "$RUNNER_TEMP/python-ci/bin/python" -m pip install -r .github/ci/requirements.txt
+      - name: Lint JavaScript and ES5 TV scripts
+        env:
+          NODE_PATH: ${{ runner.temp }}/lint-tools/node_modules
+        run: node tools/lint.cjs
+      - name: Lint Python
+        run: '"$RUNNER_TEMP/python-ci/bin/python" -m ruff check --select F63,F7,F82 ipk tools .github/actions/package-webos/check.py'
+      - name: Lint workflows and their shell commands
+        env:
+          GOBIN: ${{ runner.temp }}/go-bin
+          GOCACHE: ${{ runner.temp }}/go-cache
+          GOMODCACHE: ${{ runner.temp }}/go-modules
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$RUNNER_TEMP/go-bin/actionlint" -color
+          shellcheck .github/actions/package-webos/setup.sh
+      - name: Test release planning and publication guards
+        run: python3 tools/release-check.py
+      - name: Test service, security and localisation on Node 8.12.0
+        run: sh tools/node8-check.sh
+      - name: Install isolated packager
+        id: packager
+        run: bash .github/actions/package-webos/setup.sh
+      - name: Check standalone packager and legacy command
+        env:
+          NODE_PATH: ${{ steps.packager.outputs.directory }}/node_modules
+        run: python3 .github/actions/package-webos/check.py
+      - name: Check signed multi-app and release-version builds with temporary test keys
+        env:
+          NODE_PATH: ${{ steps.packager.outputs.directory }}/node_modules
+          CYTV_BUILD: ${{ github.sha }}
+        run: python3 tools/package-check.py
+      - name: Build documentation strictly
+        run: '"$RUNNER_TEMP/python-ci/bin/zensical" build --clean --strict'
+      - name: Upload unsigned preview packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: checked-ipk-${{ github.sha }}
+          path: |
+            dist/*.ipk
+            dist/*.tgz
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove isolated packager
+        if: always() && steps.packager.outputs.directory != ''
+        env:
+          TOOLING_DIRECTORY: ${{ steps.packager.outputs.directory }}
+        run: rm -rf -- "$TOOLING_DIRECTORY"

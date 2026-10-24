@@ -1,5 +1,6 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Home</title>
+<html><head><meta charset="utf-8"><title>CleanYourTV</title>
+<script src="../shared/api.js"></script><script src="../shared/i18n.js"></script>
 <meta name="viewport" content="width=1920">
 <style>
 /* Built for a weak TV GPU: only transform and opacity ever animate; no blur, masks or filters. Everything a theme changes (manager > Theme) is a
@@ -185,7 +186,7 @@ body{background-image:var(--wall);background-size:1920px 1080px}
 <div id="lv"><div id="lv-stage"></div><div id="lv-spin" class="layer"></div><div id="lv-osd" class="layer"><img class="logo" id="lv-ologo" alt=""><div class="num" id="lv-onum"></div><div class="info"><div class="name" id="lv-oname"></div><div class="now" id="lv-onow"></div><div class="next" id="lv-onext"></div><div class="facts" id="lv-ofacts"></div><div class="pbar"><i id="lv-obar"></i></div></div></div><div id="lv-numin" class="layer"></div><div id="lv-guide" class="layer"><div id="lv-glow"></div><div id="lv-gtop"><div id="lv-gtitle"></div><div id="lv-gtabs"></div><input id="lv-search" type="text" autocomplete="off"><div id="lv-gclock"></div></div><div id="lv-rows"></div><div id="lv-detail"></div></div><div id="lv-filter" class="layer"></div><div id="lv-menu" class="layer"></div><div id="lv-msg" class="layer"></div><div id="lv-tune" class="layer"></div><div id="lv-toast" class="layer"></div><div id="lv-stats" class="layer"></div></div>
 <div id="toast"></div>
 <script>
-var API='http://127.0.0.1:8765', CACHE_KEY='cytv.cache.v4', VERSION='1.4.12';
+var API='http://127.0.0.1:8765', CACHE_KEY='cytv.cache.v4', VERSION='1.4.13';
 var DEFAULTS={
   dock:['netflix','youtube.leanback.v4','amazon','com.disney.disneyplus-prod'],
   topbar:[{label:'Inputs',icon:'inputs',action:'inputs'},{label:'Live TV',icon:'tv',action:'live'},{label:'Settings',icon:'settings',app:'com.palm.app.settings'}]
@@ -208,7 +209,7 @@ function svg(name){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentC
 
 
 /* ---------- language and clock follow the TV ---------- */
-var LOC=(window.webOSSystem&&webOSSystem.locale)||navigator.language||'en-GB', LANG=LOC.slice(0,2);
+var LOC=(window.webOSSystem&&webOSSystem.locale)||navigator.language||'en-GB', LANG=CYTV_I18N.language(LOC);
 var TX={
  nl:{'Inputs':'Ingangen','Settings':'Instellingen','Customise':'Aanpassen','Open':'Openen','Move left in dock':'Naar links in dock','Move right in dock':'Naar rechts in dock','Remove from dock':'Uit dock verwijderen','Add to dock':'Aan dock toevoegen','Add to dock...':'Aan dock toevoegen...','Replace which app?':'Welke app vervangen?','Hide app':'App verbergen','Remove this button':'Deze knop verwijderen','hold OK on an app':'houd OK ingedrukt op een app','Hold OK on any app to change the dock':'Houd OK ingedrukt op een app om het dock te wijzigen','Top buttons':'Knoppen bovenaan','Hidden apps':'Verborgen apps','App order':'Volgorde van apps','Most used first':'Meest gebruikt eerst','A to Z':'A tot Z','Reset customisation':'Aanpassingen herstellen','Add a button...':'Knop toevoegen...','Add a button':'Knop toevoegen','An app...':'Een app...','Pick an app':'Kies een app','OK to remove':'OK om te verwijderen','Hidden apps (OK to show again)':'Verborgen apps (OK om te tonen)','No hidden apps':'Geen verborgen apps','Restore LG Home':'LG Home herstellen','Switching to LG Home: the TV restarts...':'Overschakelen naar LG Home: de TV start opnieuw op...','Could not open':'Kan niet openen','Could not save settings':'Instellingen opslaan mislukt','Helper not reachable, retrying...':'Helper niet bereikbaar, opnieuw proberen...','Connected':'Verbonden','Active':'Actief','Clock':'Klok','Automatic':'Automatisch','24-hour':'24-uurs','12-hour':'12-uurs'},
  de:{'Inputs':'Eingänge','Settings':'Einstellungen','Customise':'Anpassen','Open':'Öffnen','Move left in dock':'Im Dock nach links','Move right in dock':'Im Dock nach rechts','Remove from dock':'Aus dem Dock entfernen','Add to dock':'Zum Dock hinzufügen','Add to dock...':'Zum Dock hinzufügen...','Replace which app?':'Welche App ersetzen?','Hide app':'App ausblenden','Remove this button':'Diese Schaltfläche entfernen','hold OK on an app':'OK auf einer App gedrückt halten','Hold OK on any app to change the dock':'Halte OK auf einer App gedrückt, um das Dock zu ändern','Top buttons':'Obere Schaltflächen','Hidden apps':'Ausgeblendete Apps','App order':'App-Reihenfolge','Most used first':'Meistgenutzte zuerst','A to Z':'A bis Z','Reset customisation':'Anpassungen zurücksetzen','Add a button...':'Schaltfläche hinzufügen...','Add a button':'Schaltfläche hinzufügen','An app...':'Eine App...','Pick an app':'App auswählen','OK to remove':'OK zum Entfernen','Hidden apps (OK to show again)':'Ausgeblendete Apps (OK zum Einblenden)','No hidden apps':'Keine ausgeblendeten Apps','Restore LG Home':'LG Home wiederherstellen','Switching to LG Home: the TV restarts...':'Wechsel zu LG Home: Der Fernseher startet neu...','Could not open':'Konnte nicht geöffnet werden','Could not save settings':'Einstellungen konnten nicht gespeichert werden','Helper not reachable, retrying...':'Helper nicht erreichbar, neuer Versuch...','Connected':'Verbunden','Active':'Aktiv','Clock':'Uhr','Automatic':'Automatisch','24-hour':'24 Stunden','12-hour':'12 Stunden'},
@@ -232,8 +233,19 @@ var TXL={nl:{'Live TV':'Live TV','All channels':'Alle zenders','Loading channels
  es:{"Favourites":"Favoritos","Recent":"Recientes","Search...":"Buscar...","Filters":"Filtros","Country":"País","Language":"Idioma","Quality":"Calidad","All":"Todos","Clear filters":"Quitar filtros","Added to favourites":"Añadido a favoritos","Removed from favourites":"Quitado de favoritos","Favourite":"Favorito","On":"Sí","Off":"No","Stream":"Emisión","streams":"emisiones","Statistics":"Estadísticas","Close":"Cerrar","Tuning...":"Sintonizando...","Checking why...":"Buscando la causa...","buffer":"búfer","frames":"imágenes","dropped":"perdidas","reloaded":"recargado",
   "No favourites yet. Press the green button on a channel.":"Aún no hay favoritos. Pulsa el botón verde en un canal.","Nothing watched yet.":"Todavía no has visto nada.","No channels match.":"Ningún canal coincide.",
   "The server refused the stream: it may be blocked in your country or need special request headers.":"El servidor rechaza la emisión: puede estar bloqueada en tu país o necesitar cabeceras especiales.","The stream was not found (404): the channel is offline or its address has changed.":"No se encontró la emisión (404): el canal está fuera de línea o su dirección cambió.","The stream server reported an error.":"El servidor de la emisión informa de un error.","The address answers with a web page, not a video.":"La dirección devuelve una página web, no un vídeo.","This stream is protected by DRM and cannot be played here.":"Esta emisión está protegida con DRM y no se puede reproducir aquí.","The stream server cannot be reached.":"No se puede acceder al servidor de la emisión.","The stream is too slow to start.":"La emisión tarda demasiado en empezar.","The stream answers, but the TV could not play it: probably a format it cannot decode.":"La emisión responde, pero el televisor no pudo reproducirla: probablemente un formato que no sabe decodificar."}};
- for(var l in add){TXL[l]=TXL[l]||{};for(var k in add[l])TXL[l][k]=add[l][k]}})();
-function t(k){var d=TX[LANG],l=TXL[LANG];return (d&&d[k])||(l&&l[k])||k}
+  add.nl['Live TV']='Live TV';add.de['Live TV']='Live-TV';add.fr['Live TV']='TV en direct';add.es['Live TV']='TV en directo';
+  var home={
+    nl:{'Dock':'Favoriete apps','LG Home':'LG-startscherm','The service ({0}) is older than this launcher needs: update it in the CleanYourTV manager':'De service ({0}) is te oud voor dit startscherm: werk deze bij in de CleanYourTV-manager'},
+    de:{'Dock':'Favorisierte Apps','LG Home':'LG-Startbildschirm','The service ({0}) is older than this launcher needs: update it in the CleanYourTV manager':'Der Dienst ({0}) ist für diesen Startbildschirm zu alt: aktualisiere ihn im CleanYourTV-Manager'},
+    fr:{'Dock':'Applications favorites','LG Home':'Accueil LG','The service ({0}) is older than this launcher needs: update it in the CleanYourTV manager':'Le service ({0}) est trop ancien pour cet accueil : mettez-le à jour dans le gestionnaire CleanYourTV'},
+    es:{'Dock':'Apps favoritas','LG Home':'Inicio de LG','The service ({0}) is older than this launcher needs: update it in the CleanYourTV manager':'El servicio ({0}) es demasiado antiguo para esta pantalla: actualízalo en el gestor de CleanYourTV'}};
+  var player={
+    nl:{'No channels':'Geen zenders','no picture':'Geen beeld','s':'s','GEO':'Regiobeperking','NOT 24/7':'Niet 24/7','HEADERS':'Speciale HTTP-headers'},
+    de:{'No channels':'Keine Sender','no picture':'Kein Bild','s':'s','GEO':'Regionssperre','NOT 24/7':'Nicht rund um die Uhr','HEADERS':'Spezielle HTTP-Header'},
+    fr:{'No channels':'Aucune chaîne','no picture':'Aucune image','s':'s','GEO':'Restriction régionale','NOT 24/7':'Pas en continu','HEADERS':'En-têtes HTTP spéciaux'},
+    es:{'No channels':'No hay canales','no picture':'Sin imagen','s':'s','GEO':'Restricción regional','NOT 24/7':'Horario limitado','HEADERS':'Cabeceras HTTP especiales'}};
+  for(var l in add){TXL[l]=TXL[l]||{};for(var k in add[l])TXL[l][k]=add[l][k];for(var h in home[l])TX[l][h]=home[l][h];for(var p in player[l])TXL[l][p]=player[l][p]}})();
+function t(k){if(CYTV_I18N.catalogs[LANG])return CYTV_I18N.t(k,LANG);var d=TX[LANG],l=TXL[LANG];return (d&&d[k])||(l&&l[k])||k}
 /* a button's label: built-in buttons are translated, buttons you added keep the app's own name */
 function barLabel(o){return o.action==='inputs'?t('Inputs'):o.app==='com.palm.app.settings'?t('Settings'):o.action==='customize'?t('Customise'):o.action==='live'?t('Live TV'):(o.label||'')}
 function clockOpts(){var c=cfg.clock,o={hour:'numeric',minute:'2-digit'};if(c==='24'){o.hourCycle='h23'}else if(c==='12'){o.hourCycle='h12';o.hour='numeric'}return o}
@@ -242,9 +254,9 @@ var apps=[], cfg={}, usage={}, warned=false, rows=[], r=1, c=0, colors={}, tiles
 function $(id){return document.getElementById(id)}
 var toastT;
 function toast(t){var e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(toastT);toastT=setTimeout(function(){e.classList.remove('on')},4000)}
-var MIN_SERVICE='1.4.3';
+var MIN_SERVICE='1.5.13';
 function oldSvc(v){var a=String(v).split('.'),b=MIN_SERVICE.split('.');for(var i=0;i<3;i++){var x=+a[i]||0,y=+b[i]||0;if(x!==y)return x<y}return false}
-function api(p,body){return fetch(API+p,body?{method:'POST',body:JSON.stringify(body)}:{}).then(function(x){return x.json()})}
+function api(p,body){return CYTV.api(API+p,body)}
 function launch(id,params){if(id==='__live')return LIVE.enter();api('/api/launch',{id:id,params:params}).then(function(x){if(x&&x.returnValue===false)toast(t('Could not open')+' '+id)})}
 function store(){try{localStorage.setItem(CACHE_KEY,JSON.stringify({apps:apps,cfg:cfg,usage:usage,colors:colors}))}catch(e){}}
 function storeSoon(){clearTimeout(saveT);saveT=setTimeout(store,1500)}
@@ -319,7 +331,7 @@ function tile(a){
   if(tiles[a.id])return tiles[a.id];
   var d=document.createElement('div');d.className='tile'+(a.sys?' sys':'');d._a=a;
   tiles[a.id]=d;hit(d);
-  if(a.sys){d.innerHTML=svg(a.icon)+'<div class="slab">'+'LG Home'+'</div>';return d}
+  if(a.sys){d.innerHTML=svg(a.icon)+'<div class="slab">'+t('LG Home')+'</div>';return d}
   var known=colors[a.id];
   if(known){paint(d,known);d._col=known}
   var i=new Image();i.alt='';i.decoding='async';d._i=i;
@@ -327,7 +339,7 @@ function tile(a){
   i.onload=function(){if(!colors[a.id]){var col=iconColor(i,a.id);d._col=col;paint(d,col);fit(d,!!(d.parentNode&&d.parentNode.id==='dock'));if(!col.t){colors[a.id]=col;storeSoon()}if(rows[r]&&rows[r][c]===d)glowNow(d)}};
   i.onerror=function(){i.remove();var t=document.createElement('div');t.className='t';t.textContent=a.title;d.appendChild(t);
     if(!colors[a.id]){var f=hsl2rgb(hashHue(a.id),.42,.42);paint(d,{c:f,b:hsl2rgb(hashHue(a.id),.4,.2)})}};   /* not remembered: a failed load must not pin a made-up colour */
-  i.src=a.id==='__live'?LIVE_ICON:API+'/icon/'+encodeURIComponent(a.id);d.appendChild(i);if(i.decode)i.decode().catch(function(){});
+  if(a.id==='__live')i.src=LIVE_ICON;else CYTV.ready().then(function(){i.src=CYTV.image(API+'/icon/'+encodeURIComponent(a.id))}).catch(function(){i.onerror()});d.appendChild(i);if(i.decode)i.decode().catch(function(){});
   return d}
 
 /* ---------- ambient glow: two layers cross-fade, updated only once focus settles ---------- */
@@ -347,7 +359,7 @@ function applyTheme(t){
   if(!t||!t.vars){TH=TH0;return}
   for(k in t.vars){st.setProperty(k,t.vars[k]);themeKeys.push(k)}
   var w=t.wallpaper;
-  if(w){var d='rgba('+t.nightRgb+','+w.dim+')';st.setProperty('--wall','linear-gradient('+d+','+d+'),url("'+API+'/api/theme/wallpaper/'+w.file+'")');themeKeys.push('--wall')}
+  if(w){var d='rgba('+t.nightRgb+','+w.dim+')';st.setProperty('--wall','linear-gradient('+d+','+d+'),url("'+CYTV.image(API+'/api/theme/wallpaper/'+w.file)+'")');themeKeys.push('--wall')}
   for(k in t.attrs)b.setAttribute('data-'+k,t.attrs[k]);
   TH={cols:t.cols||10,tileH:t.tileH||151,gapY:t.gapY||26,gt:t.gt||350,viewH:t.viewH||780,dockN:t.dockN||4,overlay:!!t.overlay,overlayH:t.overlayH||510,glow:t.glowRgb||''}}
 
@@ -454,7 +466,7 @@ function barMenu(o){openMenu(barLabel(o),[{label:t('Remove this button'),fn:func
 
 function customizeMenu(){
   openMenu(t('Customise'),[
-    {label:'Dock',sub:t('hold OK on an app'),stay:true,fn:function(){toast(t('Hold OK on any app to change the dock'))}},
+    {label:t('Dock'),sub:t('hold OK on an app'),stay:true,fn:function(){toast(t('Hold OK on any app to change the dock'))}},
     {label:t('Top buttons'),stay:true,fn:topButtonsMenu},
     {label:t('Hidden apps'),stay:true,fn:hiddenMenu},
     {label:t('App order'),sub:cfg.sort==='alpha'?t('A to Z'):t('Most used first'),fn:function(){cfg.sort=cfg.sort==='alpha'?'usage':'alpha';saveCfg()}},
@@ -496,7 +508,7 @@ function rebuild(){
   setFocus(nr,nc,true)}
 
 function load(){api('/api/apps').then(function(x){
-  if(x.version&&oldSvc(x.version)&&!warned){warned=true;toast('The service ('+x.version+') is older than this launcher needs: update it in the CleanYourTV manager')}
+  if(x.version&&oldSvc(x.version)&&!warned){warned=true;toast(CYTV_I18N.format(t('The service ({0}) is older than this launcher needs: update it in the CleanYourTV manager'),[x.version]))}
   usage=x.usage||{};
   var rank=Object.keys(usage).sort(function(a,b){return usage[b]-usage[a]});
   var sig=JSON.stringify([x.apps.map(function(a){return a.id}),x.config,rank]);
@@ -696,7 +708,7 @@ var LIVE=(function(){
   function badges(c){
     var h='';if(isFav(c))h+=STAR;
     if(c.q)h+='<span class="bd">'+c.q+'</span>';
-    if(c.fl&1)h+='<span class="bd w">GEO</span>';if(c.fl&2)h+='<span class="bd w">NOT 24/7</span>';if(c.fl&4)h+='<span class="bd w">HEADERS</span>';
+    if(c.fl&1)h+='<span class="bd w">'+t('GEO')+'</span>';if(c.fl&2)h+='<span class="bd w">'+t('NOT 24/7')+'</span>';if(c.fl&4)h+='<span class="bd w">'+t('HEADERS')+'</span>';
     if(c.alt.length)h+='<span class="bd">×'+(c.alt.length+1)+'</span>';
     if(c.key&&S.failed[c.key])h+='<span class="bd w">!</span>';
     return h?'<div class="bds">'+h+'</div>':''}
@@ -785,7 +797,7 @@ var LIVE=(function(){
     var v=video;if(!v)return '';
     var q=v.getVideoPlaybackQuality?v.getVideoPlaybackQuality():null,ahead=0;
     try{if(v.buffered&&v.buffered.length)ahead=v.buffered.end(v.buffered.length-1)-v.currentTime}catch(e){}
-    return (v.videoWidth?v.videoWidth+'×'+v.videoHeight:'no picture')+'\n'+t('buffer')+' '+ahead.toFixed(1)+' s\n'+(q?t('frames')+' '+q.totalVideoFrames+', '+t('dropped')+' '+q.droppedVideoFrames+'\n':'')+t('Stream')+' '+(si+1)+'/'+streams.length+(reloads?'  ('+t('reloaded')+')':'')}
+    return (v.videoWidth?v.videoWidth+'×'+v.videoHeight:t('no picture'))+'\n'+t('buffer')+' '+ahead.toLocaleString(LOC,{maximumFractionDigits:1})+' '+t('s')+'\n'+(q?t('frames')+' '+q.totalVideoFrames+', '+t('dropped')+' '+q.droppedVideoFrames+'\n':'')+t('Stream')+' '+(si+1)+'/'+streams.length+(reloads?'  ('+t('reloaded')+')':'')}
   function setStats(on){stats=on;clearInterval(statsT);layer('lv-stats',on);if(on){$('lv-stats').textContent=statsText();statsT=setInterval(function(){$('lv-stats').textContent=statsText()},1000)}}
 
   function digit(d){
@@ -807,7 +819,7 @@ var LIVE=(function(){
       (function load(){
         if(!o.on)return;
         api('/api/live/channels').then(function(x){
-          if(!x.channels.length){if(++tries>40){msg('<div>'+lesc(s.error||'No channels')+'</div>');return}setTimeout(load,2000);return}
+          if(!x.channels.length){if(++tries>40){msg('<div>'+lesc(s.error?CYTV_I18N.error(s.error,LANG):t('No channels'))+'</div>');return}setTimeout(load,2000);return}
           groups=x.groups;chans=x.channels.map(function(r){return {num:r[0],id:r[1],name:r[2],group:r[3],logo:r[4],url:r[5],key:r[6]||'',cc:r[7]||'',lang:r[8]||'',q:r[9]||'',fl:r[10]||0,cats:r[11]||(r[3]?[r[3]]:[]),alt:(r[12]||[]).map(function(a){return {url:a[0],q:a[1]}})}});
           byNum={};byKey={};chans.forEach(function(c){byNum[c.num]=c;if(c.key)byKey[c.key]=c});loaded=true;facets();
           var last=0;try{last=parseInt(localStorage.getItem('live.last'),10)}catch(e){}

@@ -205,7 +205,7 @@ async function askLlm(text) {
   let answer = '', tool = false;
   for (let attempt = 0; attempt < 2 && !answer; attempt++) {
     const messages = [{ role: 'system', content: system + (attempt ? ' You have no tools and cannot search the internet: never call a tool. Answer in plain text from what you know, and say so if it may be out of date.' : '') }].concat(turns);
-    const r = await request(orApi() + '/chat/completions', { authorization: 'Bearer ' + l.key, 'HTTP-Referer': 'https://github.com/lasharor/cleanyourtv-WebOS', 'X-Title': 'CleanYourTV' },
+    const r = await request(orApi() + '/chat/completions', { authorization: 'Bearer ' + l.key, 'HTTP-Referer': 'https://github.com/atlet99/cleanyourtv-WebOS', 'X-Title': 'CleanYourTV' },
       { model: l.model, messages, max_tokens: 500, reasoning: { exclude: true } }, 60000);
     let o = {}; try { o = JSON.parse(r.text); } catch (_) {}
     if (r.status !== 200 || o.error) throw new Error('OpenRouter: ' + String((o.error && (o.error.message || o.error.code)) || 'HTTP ' + r.status).slice(0, 160));
@@ -249,7 +249,7 @@ async function askHa(text) {
   const type = String(res.response_type || ''), code = String(res.data && res.data.code || '');
   const speech = String(res.speech && res.speech.plain && res.speech.plain.speech || '').trim();
   if (o.conversation_id) haConv = { id: String(o.conversation_id), at: Date.now() };
-  return { text: speech || (type === 'action_done' ? 'Done' : ''), understood: !(type === 'error' && code === 'no_intent_match'), type, code };
+  return { text: speech || (type === 'action_done' ? 'Done' : ''), generated: !speech && type === 'action_done', understood: !(type === 'error' && code === 'no_intent_match'), type, code };
 }
 async function haTest() {
   const h = haCfg();
@@ -272,11 +272,11 @@ async function respond(text, card) {
   const useHa = haReady(h) && h.route !== 'ai-only', useAi = l.enabled && l.key && !(useHa && h.route === 'ha-only');
   if (!useHa && !useAi && !c.url) { await say({ kind: 'answer', title: 'You said', text, seconds: readSeconds(text) }); return out; }
   if (useHa || useAi) await say({ kind: 'thinking', title: 'Thinking', question: text, text: '', seconds: 90 });
-  let haText = '';
+  let haText = '', generatedAnswer = false;
   if (useHa) {
     try {
       const r = await askHa(text); haText = r.text;
-      if (r.understood && r.text) { out.answer = r.text; out.via = 'ha'; }
+      if (r.understood && r.text) { out.answer = r.text; out.via = 'ha'; generatedAnswer = r.generated; }
     } catch (e) { out.error = 'Home Assistant: ' + e.message; }
   }
   if (!out.answer && useAi) {
@@ -290,7 +290,7 @@ async function respond(text, card) {
       if (r && !out.answer) { out.answer = r.text; out.card = r; }
     } catch (e) { out.error = (out.error ? out.error + '; ' : '') + e.message; }
   }
-  if (out.answer || (out.card && out.card.image)) await say(Object.assign({ kind: 'answer', title: out.via === 'ha' ? 'Home Assistant' : 'Answer', question: text, text: out.answer || '', seconds: readSeconds(out.answer) }, out.card && out.card.image ? { image: out.card.image } : {}, out.card && out.card.seconds ? { seconds: out.card.seconds } : {}));
+  if (out.answer || (out.card && out.card.image)) await say(Object.assign({ kind: 'answer', title: out.via === 'ha' ? 'Home Assistant' : 'Answer', question: text, text: out.answer || '', seconds: readSeconds(out.answer) }, generatedAnswer ? { textKey: 'Done' } : {}, out.card && out.card.image ? { image: out.card.image } : {}, out.card && out.card.seconds ? { seconds: out.card.seconds } : {}));
   else if (out.error) await say({ kind: 'answer', title: 'Not answered', question: text, text: out.error, seconds: 10 });
   else await say({ kind: 'answer', title: 'You said', text, seconds: readSeconds(text) });
   return out;
@@ -397,20 +397,21 @@ const PAIR_PORT = 8769, PAIR_MS = 10 * 60 * 1000;
 let pair = null, pairedAt = 0;
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function lanIp() { for (const l of Object.values(require('os').networkInterfaces())) for (const i of l) if (i.family === 'IPv4' && !i.internal) return i.address; return ''; }
-function pairPage(msg, done, list, token) {
+function pairPage(msg, done, list, token, lang) {
+  const i18n = require(fs.existsSync(__dirname + '/i18n.js') ? './i18n' : '../shared/i18n');
   const l = llmCfg(), c = cfg(), ha = haCfg();
   const opts = (list || []).map(m => `<option value="${esc(m.id)}">${esc(m.name)}${m.price != null ? ' · $' + m.price + '/M' : ''}</option>`).join('');
   return `<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>Voice setup</title>
 <style>body{font:18px system-ui,sans-serif;background:#111;color:#eee;max-width:560px;margin:32px auto;padding:0 18px}label{display:block;color:#aaa;font-size:15px;margin-top:14px}input,textarea,select,button{font:inherit;width:100%;box-sizing:border-box;padding:12px;margin:6px 0;border-radius:10px;border:1px solid #444;background:#1b1b1f;color:#eee}button{background:#f5f6f8;color:#111;font-weight:600;margin-top:20px}.m{padding:12px;border-radius:10px;background:#1f2a1f}small{color:#888}h2{margin:0 0 8px}.c{display:flex;gap:10px;align-items:center}.c input{width:auto;margin:0}</style>
 <h2>Voice setup</h2>${msg ? `<p class=m>${esc(msg)}</p>` : ''}${done ? '' : `<form method=post action="/${token}/save">
-<label>OpenRouter key ${l.key ? '(one is saved; leave empty to keep it)' : ''}</label><input name=key type=password autocomplete=off placeholder="sk-or-...">
+<label>OpenRouter key <small>${l.key ? '(one is saved; leave empty to keep it)' : ''}</small></label><input name=key type=password autocomplete=off placeholder="sk-or-...">
 <label>Model <small>choose from the list or type any OpenRouter model name</small></label><input name=model list=ml value="${esc(l.model)}" autocomplete=off><datalist id=ml>${opts}</datalist>
 <label class=c><input type=checkbox name=enabled value=1 ${l.enabled ? 'checked' : ''}> Answer with the AI</label>
 <label>Instructions for the AI <small>(empty: short plain answers)</small></label><textarea name=system rows=3>${esc(l.system)}</textarea>
 <label>Home Assistant address <small>(optional, Assist)</small></label><input name=haurl type=url placeholder="http://homeassistant.local:8123" value="${esc(ha.url)}">
 <label>Home Assistant access token <small>(a long-lived token from your profile page${ha.token ? '; one is saved, leave empty to keep it' : ''})</small></label><input name=hatoken type=password autocomplete=off>
 <label class=c><input type=checkbox name=hass value=1 ${ha.selfSigned ? 'checked' : ''}> Accept a self-signed certificate</label>
-<label>Which answers first</label><select name=haroute>${[['ha-first', 'Home Assistant first, then the AI'], ['ha-only', 'Home Assistant only'], ['ai-only', 'The AI only']].map(x => `<option value="${x[0]}"${ha.route === x[0] ? ' selected' : ''}>${x[1]}</option>`).join('')}</select>
+<label>Which answers first</label><select name=haroute>${[['ha-first', 'Home Assistant first, then the AI'], ['ha-only', 'Home Assistant only'], ['ai-only', 'The AI only']].map(x => `<option value="${x[0]}"${ha.route === x[0] ? ' selected' : ''}>${i18n.t(x[1], lang)}</option>`).join('')}</select>
 <label>Send the text to your own server <small>(optional)</small></label><input name=url type=url placeholder="http://..." value="${esc(c.url)}">
 <label>Server token <small>(optional${c.token ? '; one is saved, leave empty to keep it' : ''})</small></label><input name=token type=password autocomplete=off>
 <button>Save</button></form>`}`;
@@ -419,10 +420,11 @@ function startPair() {
   stopPair();
   const token = crypto.randomBytes(16).toString('hex'); let hits = 0, list = [];
   const srv = http.createServer((req, res) => {
-    const send = (c, html) => { res.writeHead(c, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }); res.end(html); };
+    const i18n = require(fs.existsSync(__dirname + '/i18n.js') ? './i18n' : '../shared/i18n'), lang = req.headers['accept-language'] || 'en';
+    const send = (c, html) => { res.writeHead(c, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }); res.end(i18n.html(html, lang)); };
     if (++hits > 120) return send(429, 'Too many requests');
     const p = req.url.split('?')[0];
-    if (req.method === 'GET' && p === '/' + token) return send(200, pairPage('', false, list, token));
+    if (req.method === 'GET' && p === '/' + token) return send(200, pairPage('', false, list, token, lang));
     if (req.method === 'POST' && p === '/' + token + '/save') {
       let b = ''; req.on('data', c => { b += c; if (b.length > 16384) req.destroy(); });
       req.on('end', () => {
@@ -433,7 +435,7 @@ function startPair() {
         if (f.get('token')) set.token = f.get('token');
         if (!set.url) set.url = '';
         const err = applySet(set);
-        if (err) return send(400, pairPage(err, false, list, token));
+        if (err) return send(400, pairPage(err, false, list, token, lang));
         pairedAt = Date.now(); send(200, pairPage('Saved. You can close this page.', true, [], token));
         setTimeout(stopPair, 2000);
       });

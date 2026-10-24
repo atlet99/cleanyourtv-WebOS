@@ -1,5 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Inputs</title>
+<script src="../../shared/api.js"></script><script src="../../shared/i18n.js"></script>
 <style>
 *{box-sizing:border-box;margin:0}
 :root{--ink:#f5f6f8;--ink2:rgba(245,246,248,.62);--font:"LG Smart UI","Helvetica Neue",Helvetica,Arial,sans-serif}
@@ -50,17 +51,15 @@ var TX={
   fr:{Apps:'Apps',Inputs:'Entr\u00E9es',Connected:'Connect\u00E9',Live:'TV en direct',LiveSub:'Votre playlist',Nothing:'Rien de connect\u00E9',nohelper:'Impossible de lire les entr\u00E9es. La TV en direct fonctionne encore.'},
   es:{Apps:'Apps',Inputs:'Entradas',Connected:'Conectado',Live:'TV en directo',LiveSub:'Tu lista',Nothing:'Nada conectado',nohelper:'No se pueden leer las entradas. La TV en directo sigue funcionando.'}};
 var EN={Apps:'Apps',Inputs:'Inputs',Connected:'Connected',Live:'Live TV',LiveSub:'Your playlist',Nothing:'Nothing connected',nohelper:'Can\u2019t read the inputs. Live TV still works.'};
-var LANG=((window.webOSSystem&&webOSSystem.locale)||navigator.language||'en').slice(0,2);
-function t(k){return (TX[LANG]&&TX[LANG][k])||EN[k]||k}
+var LANG=CYTV_I18N.language((window.webOSSystem&&webOSSystem.locale)||navigator.language||'en');
+function t(k){if(CYTV_I18N.catalogs[LANG])return CYTV_I18N.t(EN[k]||k,LANG);return (TX[LANG]&&TX[LANG][k])||EN[k]||k}
+document.title=t('Inputs');
 function $(i){return document.getElementById(i)}
 function call(uri,p){try{var b=new PalmServiceBridge();b.onservicecallback=function(){};b.call(uri,JSON.stringify(p));return true}catch(e){return false}}
-function log(m){try{var x=new XMLHttpRequest();x.open('GET',API+'/api/log?m='+encodeURIComponent('picker '+m));x.send()}catch(e){}}
+function log(m){CYTV.api(API+'/api/log?m='+encodeURIComponent('picker '+m)).catch(function(){})}
 function launch(id,params){
   log('launch '+id+' '+JSON.stringify(params||{}));
-  var x=new XMLHttpRequest();x.open('POST',API+'/api/launch');x.timeout=4000;
-  x.onload=function(){log('launch reply '+x.responseText.slice(0,120))};
-  x.onerror=x.ontimeout=function(){log('helper did not answer; trying the system');call('luna://com.webos.applicationManager/launch',{id:id,params:params||{}})};
-  x.send(JSON.stringify({id:id,params:params||{}}))}
+  CYTV.api(API+'/api/launch',{id:id,params:params||{}}).then(function(x){log('launch reply '+JSON.stringify(x).slice(0,120))},function(){log('helper did not answer; trying the system');call('luna://com.webos.applicationManager/launch',{id:id,params:params||{}})})}
 function hide(){log('hide');shown=false;document.body.classList.remove('on');try{webOSSystem.hide()}catch(e){}}
 function cur(){return row===0?apps:inputs}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(cache))}catch(e){}}
@@ -84,7 +83,7 @@ function render(){
   var imgs=$('apps').querySelectorAll('img');
   apps.forEach(function(a,i){var im=imgs[i],data=cache.icons[a.id];im.crossOrigin='anonymous';
     if(data)im.src=data;
-    else{im.onload=function(){keep(im,a.id)};im.src=API+'/icon/'+encodeURIComponent(a.id)}});
+    else{im.onload=function(){keep(im,a.id)};CYTV.ready().then(function(){im.src=CYTV.image(API+'/icon/'+encodeURIComponent(a.id))}).catch(function(){})}});
   h='';inputs.forEach(function(r,i){h+='<div class="chip'+(r.dim?' dim':'')+(r.active?' act':'')+'" data-r="1" data-i="'+i+'">'+ICON[r.icon]+'<div class="tx"><span class="lb"></span><span class="st"></span></div></div>'});
   $('inputs').innerHTML=h;
   var el=$('inputs').children;inputs.forEach(function(r,i){el[i].querySelector('.lb').textContent=r.label;el[i].querySelector('.st').textContent=r.sub||''});
@@ -112,8 +111,7 @@ function setData(d,fresh){
   col[0]=Math.min(col[0],Math.max(0,apps.length-1));col[1]=Math.min(col[1],inputs.length-1);
   if(row===0&&!apps.length)row=1;
   paint()}
-function get(path,cb,fail){var x=new XMLHttpRequest();x.open('GET',API+path);x.timeout=4000;
-  x.onload=function(){try{cb(JSON.parse(x.responseText))}catch(e){fail&&fail()}};x.onerror=x.ontimeout=function(){fail&&fail()};x.send()}
+function get(path,cb,fail){CYTV.api(API+path).then(cb,function(){fail&&fail()})}
 function refresh(){
   var got={apps:null,inputs:null};
   function done(){if(!got.apps||!got.inputs)return;cache.apps=got.apps;cache.inputs=got.inputs;persist();$('msg').textContent='';setData(cache,false)}

@@ -1,0 +1,22 @@
+{
+  "help": {
+    "count": 52,
+    "sha256": "cbb63ada5ec9edee330735b8e6aac0737e1fd22e041f982076bc766a7c4a3f78"
+  },
+  "launcher": {
+    "count": 41,
+    "sha256": "4ad47271bcc7d01e3cbcc5c29efce26b591f87dba7f5fa39d0d2f06620fef3a2"
+  },
+  "picker": {
+    "count": 7,
+    "sha256": "9e5f32e97aecb4aa9ca8ecf4fc0454615f5f0c8caf6861ed2cdee0c16275e234"
+  },
+  "player": {
+    "count": 54,
+    "sha256": "01096637c13075060df0157eafd6f8205d6c9d903c89cc5cf9c4a920566f0951"
+  },
+  "shared": {
+    "count": 585,
+    "sha256": "c30bb6d0a04b20ca6cb50c3b7dced6c395ad9feed49fe4c3a4859c3963077d0f"
+  }
+}

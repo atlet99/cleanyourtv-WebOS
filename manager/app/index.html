@@ -1,5 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>CleanYourTV</title>
+<script src="../../shared/api.js"></script><script src="../../shared/i18n.js"></script>
 <meta name="viewport" content="width=1920">
 <style>
 *{box-sizing:border-box;margin:0}
@@ -15,7 +16,7 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:var(--night);col
 #banner.work{color:var(--ink)}#banner.err{color:#ff9a8a}#banner.ok{color:#9be3b0}
 .row{display:flex;align-items:center;gap:22px;height:84px;padding:0 34px;border-radius:30px;font-size:30px;font-weight:500;background:#1a1c22;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 .row .lb{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.row .st{font-size:24px;opacity:.7;white-space:nowrap}
+.row .st{font-size:24px;opacity:.7;white-space:nowrap;max-width:60%;overflow:hidden;text-overflow:ellipsis}
 .row.dim{opacity:.55}
 .row.f{background:var(--ink);color:#0b0c10;opacity:1}
 .sep{height:14px}
@@ -39,13 +40,16 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:var(--night);col
 var kFlow='input', kText='', kRows=[], kTimer=0, upd=null, checkedOffline=false, forceOffer=false, API='http://127.0.0.1:8765', SVC='/media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service';
 var napi=null, lv=null, th=null, vo=null, mdl=[], agl=[], tst=null, shareMode='log', pairBase=0,  idxStack=[], setupIdx=0, updIdx=0, st=null, rows=[], idx=0, view='main', pending=null, pollT=0, setup={debloat:true,inputKey:true}, offline=false, busyMsg='';
 function $(i){return document.getElementById(i)}
-function api(p,body){return new Promise(function(res,rej){var x=new XMLHttpRequest();x.open(body?'POST':'GET',API+p);x.timeout=30000;
-  x.onload=function(){try{res(JSON.parse(x.responseText))}catch(e){rej(e)}};x.onerror=x.ontimeout=function(){rej(new Error('no answer'))};x.send(body?JSON.stringify(body):null)})}
+function t(s){return CYTV_I18N.t(s)}
+function ui(id,s){$(id).textContent=t(s)}
+document.documentElement.lang=CYTV_I18N.language((window.webOSSystem&&webOSSystem.locale)||navigator.language);
+function api(p,body){return CYTV.api(API+p,body)}
 function rootExec(cmd){return new Promise(function(res){try{var b=new PalmServiceBridge();b.onservicecallback=function(m){res(m)};
   b.call('luna://org.webosbrew.hbchannel.service/exec',JSON.stringify({command:cmd}))}catch(e){res(JSON.stringify({returnValue:false,errorText:String(e)}))}})}
+function rootRun(cmd){return rootExec('umask 077; R=$(node '+SVC+'/helper/security.js run) || exit 1; '+cmd)}
 function launch(id,params){try{var b=new PalmServiceBridge();b.onservicecallback=function(){};b.call('luna://com.webos.applicationManager/launch',JSON.stringify({id:id,params:params||{}}))}catch(e){}}
 function onoff(v){return v?'On':'Off'}
-function banner(text,cls){var b=$('banner');b.textContent=text||'';b.className=cls||'';b.style.display=text?'':'none'}
+function banner(text,cls){var b=$('banner');b.textContent=cls==='err'?CYTV_I18N.error(text||''):t(text||'');b.className=cls||'';b.style.display=text?'':'none'}
 
 function push(v){idxStack.push([view,idx]);view=v;idx=0;build();draw()}   // into a screen; pop returns to the row we left
 function pop(){var p=idxStack.pop()||['main',0];view=p[0];idx=p[1];build();draw()}
@@ -56,7 +60,7 @@ function build(){
   if(view==='notifyhow'||view==='voicehow'){rows.push({label:'Back',fn:pop});return}
   if(view==='theme'){
     var tc=(th&&th.current)||{id:'classic',accent:''};
-    (th&&th.themes||[]).forEach(function(x){rows.push({label:x.name,sub:(x.id===tc.id?'selected \u00B7 ':'')+x.description,fn:function(){setTheme({id:x.id})}})});
+    (th&&th.themes||[]).forEach(function(x){rows.push({label:x.name,sub:(x.id===tc.id?t('selected')+' \u00B7 ':'')+t(x.description),fn:function(){setTheme({id:x.id})}})});
     rows.push({sep:true});
     var an='Theme default';((th&&th.accents)||[]).forEach(function(a){if(a.hex===tc.accent)an=a.name});
     rows.push({label:'Accent colour',sub:an,fn:function(){push('accent')}});
@@ -75,12 +79,12 @@ function build(){
     rows.push({sep:true});rows.push({label:'Back',fn:pop});return}
   if(view==='models'){
     var cur=((vo||{}).llm||{}).model;
-    mdl.forEach(function(x){rows.push({label:x.name,sub:x.id+(x.price!=null?' \u00B7 $'+x.price+' per million words in':'')+(x.id===cur?' \u00B7 selected':''),fn:function(){pickModel(x.id)}})});
+    mdl.forEach(function(x){rows.push({label:x.name,rawLabel:x.id!=='openrouter/auto',sub:x.id+(x.price!=null?' \u00B7 $'+x.price+t(' per million input tokens'):'')+(x.id===cur?' \u00B7 '+t('selected'):''),fn:function(){pickModel(x.id)}})});
     rows.push({sep:true});rows.push({label:'Back',fn:pop});return}
   if(view==='agents'){
     var ca=((vo||{}).ha||{}).agent||'';
     rows.push({label:'Default agent',sub:'Home Assistant\u2019s own'+(ca?'':' \u00B7 selected'),fn:function(){pickAgent('')}});
-    agl.forEach(function(x){rows.push({label:x.name,sub:x.id+(x.id===ca?' \u00B7 selected':''),fn:function(){pickAgent(x.id)}})});
+    agl.forEach(function(x){rows.push({label:x.name,rawLabel:true,sub:x.id+(x.id===ca?' \u00B7 '+t('selected'):''),fn:function(){pickAgent(x.id)}})});
     rows.push({sep:true});rows.push({label:'Back',fn:pop});return}
   if(view==='voice'){
     var v=vo||{},wk=v.job&&v.job.state==='working';
@@ -103,7 +107,7 @@ function build(){
       api('/api/voice/set',{llm:{enabled:!lm.enabled}}).then(function(x){if(x.error){banner(x.error,'err');return}vo=x;build();draw()},function(){banner('The service did not answer','err')})}});
     rows.push({label:'Model',sub:lm.model||'openrouter/auto',fn:openModels});
       rows.push({label:'Send the text to',sub:v.url?v.url.replace(/^(https?:\/\/[^\/]+).*/,'$1'):'not set · shows a card only',fn:function(){
-        kText='Set the address of your server (from a shell on the TV):\n\ncurl -X POST localhost:8765/api/voice/set -d \'{"url":"http://server:port/path","token":"optional secret"}\'\n\nThe TV sends: POST, JSON {"text":"..."}, with \"Authorization: Bearer <token>\" when a token is set. If your server answers with JSON {"text":"..."} (or plain text), the answer is shown as a card. Only the recognised text is sent, never audio.';push('voicehow')}});
+        kText=t('Set the address of your server from SSH on the TV:')+'\n\n'+curlExample('set','{"url":"http://server:port/path","token":"optional secret"}')+'\n\n'+t('The TV sends POST with JSON {"text":"..."} and Authorization: Bearer <token> if configured. A JSON {"text":"..."} or plain-text reply appears on screen. Only recognised text is sent, never audio.');push('voicehow')}});
     rows.push({sep:true});
     rows.push({label:'Set up from your phone',sub:'key, model, Home Assistant, server',fn:openPair});
     rows.push({label:'Set up with commands',sub:'for scripts and ssh',fn:function(){kText=aiHelp();push('voicehow')}});
@@ -117,7 +121,7 @@ function build(){
     rows.push({label:'Accept notifications from the network',sub:onoff(napi&&napi.enabled),fn:function(){api('/api/manager/notify-api',{enabled:!(napi&&napi.enabled)}).then(function(n){napi=n;api('/api/manager/status').then(function(s2){st=s2;build();draw()})},function(){banner('The service did not answer','err')})}});
     if(napi&&napi.enabled){
       rows.push({label:'How to send',sub:'address, token, example',fn:function(){
-        kText='Send a POST request:\nhttp://'+napi.ip+':'+napi.port+'/notify\n\nHeader:\nAuthorization: Bearer '+napi.token+'\n\nBody (JSON):\n{"title":"Front door","text":"Someone is at the door","image":"http://…/snapshot.jpg","seconds":15}';push('notifyhow')}});
+        kText=t('Send a POST request:')+'\nhttp://'+napi.ip+':'+napi.port+'/notify\n\n'+t('Header:')+'\nAuthorization: Bearer '+napi.token+'\n\n'+t('Body (JSON):')+'\n'+JSON.stringify({title:t('Front door'),text:t('Someone is at the door'),image:'https://server/snapshot.jpg',seconds:15});push('notifyhow')}});
       rows.push({label:'New token',sub:'the old one stops working',fn:function(){api('/api/manager/notify-api',{regenerate:true}).then(function(n){napi=n;banner('New token created. Open \u201CHow to send\u201D to see it.','ok');build();draw()})}});
     }
     rows.push({sep:true});rows.push({label:'Back',fn:pop});return}
@@ -158,7 +162,7 @@ function build(){
     var hk=st.inputhook||{},na=hk.hook&&!hk.hook.attached;
     rows.push({label:'Input key opens our Inputs list',sub:na?'not available on this firmware':onoff(st.options.inputKey),fn:function(){opt({inputKey:!st.options.inputKey})}});
     rows.push({label:'Learn the Input key',sub:(st.keys&&st.keys.inputIsDefault)?'default ('+st.keys.input+')':'learned: '+(st.keys&&st.keys.input),fn:function(){openKeys('input')}});
-    rows.push({label:'Learn the Home key',sub:'optional · '+(st.keys&&st.keys.home?'now: '+st.keys.home:'not learned'),fn:function(){openKeys('home')}});
+    rows.push({label:'Learn the Home key',sub:CYTV_I18N.format('optional · {0}',[t(st.keys&&st.keys.home?'now: '+st.keys.home:'not learned')]),fn:function(){openKeys('home')}});
     rows.push({sep:true});
     rows.push({label:'Back',fn:pop});
     return}
@@ -185,7 +189,7 @@ function build(){
 }
 /* what each row does, shown on the left for the focused row */
 var INFO={
- 'Launcher':'The home screen you see. Updates come from GitHub releases and are checked against a SHA-256 file before they are installed. If a new launcher does not start, the previous one is put back.',
+    'Launcher':'The home screen you see. Updates require a signed SHA-256 file verified with the installed release key. If a new launcher does not start, the previous one is put back.',
  'Service':'The background service behind the launcher: Live TV, picture notifications, the Input key, these updates. A failed update restores the previous files.',
  'Check for updates':'Looks for a newer release on GitHub. Nothing is installed until you choose an update.',
  'Update channel':'Stable releases are what most people want. A test build is a change someone asks you to try, built from a branch of the repository; it can be less finished. Choose a test build here, then use the Launcher and Service rows to install it. Going back to Stable offers the latest release again.',
@@ -239,52 +243,53 @@ var INFO={
  'Set up now':'Installs the launcher, replaces LG\u2019s Home at boot and starts the service. About a minute; the screen blinks once. If the new Home does not come up, the setup removes itself and restarts the TV.',
  'Set up anyway':'Your firmware is not in the compatibility list and LG\u2019s Home looks different. This tries it anyway; a failed start restarts the TV with LG\u2019s Home.'
 };
-function infoFor(r){if(!r||r.sep)return null;var k=r.label.replace(/ [0-9][0-9.]*$/,'');if(k==='Check for updates'&&offline)return 'Works without the service: looks for a newer package and installs it through the root service.';if(k==='CleanYourTV as Home'&&st.home&&st.home.fullhome)return {t:k,d:INFO[k]+' This TV also has LG\u2019s full-screen Home: if the Home button opens that instead of this launcher, set TV Settings > General > Home Settings > Home Style to Basic.'};return INFO[k]?{t:k,d:INFO[k]}:null}
+function infoFor(r){if(!r||r.sep)return null;var k=r.label.replace(/ [0-9][0-9.]*$/,''),d=CYTV_I18N.helpText(k,INFO[k]);if(k==='Check for updates'&&offline)d=t('Works without the service: looks for a newer package and installs it through the root service.');if(k==='CleanYourTV as Home'&&st.home&&st.home.fullhome)d+=' '+t('This TV also has LG’s full-screen Home: if Home opens that screen, choose Basic in TV Settings > General > Home Settings > Home Style.');return d?{t:k,d:d}:null}
 function draw(){
   var h='';rows.forEach(function(r,i){h+=r.sep?'<div class="sep"></div>':'<div class="row'+(i===idx?' f':'')+(r.dim?' dim':'')+'" data-i="'+i+'"><span class="lb"></span>'+(r.sub?'<span class="st"></span>':'')+'</div>'});
-  $('list').innerHTML=h;var el=$('list').children;rows.forEach(function(r,i){if(r.sep)return;el[i].querySelector('.lb').textContent=r.label;if(r.sub)el[i].querySelector('.st').textContent=r.sub});
+  $('list').innerHTML=h;var el=$('list').children;rows.forEach(function(r,i){if(r.sep)return;el[i].querySelector('.lb').textContent=r.rawLabel?r.label:t(r.label);if(r.sub)el[i].querySelector('.st').textContent=t(r.sub)});
   var inf=infoFor(rows[idx]),ie=$('info');ie.textContent='';
   $('sub').style.wordBreak='';
-  if(view==='notifyhow'||view==='voicehow'){$('sub').textContent=kText;$('sub').style.whiteSpace='pre-line';$('sub').style.wordBreak='break-all';return}
-  if(view==='notifyapi'){$('sub').textContent='Network notifications';return}
-  if(view==='models'){$('sub').textContent='Choose the model that answers';return}
-  if(view==='agents'){$('sub').textContent='Choose the Home Assistant agent';return}
-  if(view==='channel'){$('sub').textContent='Where updates come from';return}
-  if(view==='livetv'){$('sub').textContent='Live TV: your own playlist';return}
-  if(view==='confirm-live-reset'){$('sub').textContent='Remove the playlist?';return}
-  if(view==='theme'){$('sub').textContent='Choose how Home looks. The change shows the next time you open Home.';return}
-  if(view==='accent'){$('sub').textContent='The colour of the focus ring and highlights';return}
-  if(view==='voice'){var vv=vo||{},ls=vv.last?(vv.last.text?'Last heard: \u201C'+vv.last.text+'\u201D'+(vv.last.ms?' ('+(vv.last.ms/1000).toFixed(1)+' s)':'')+(vv.last.error?'\nNot sent: '+vv.last.error:''):'Last try: '+vv.last.state+(vv.last.error?'\n'+vv.last.error:'')):'';
-    $('sub').textContent='Voice \u00B7 '+(vv.engine||'')+(ls?'\n'+ls:'');$('sub').style.whiteSpace='pre-line';if(inf){var b2=document.createElement('b');b2.textContent=inf.t;ie.appendChild(b2);ie.appendChild(document.createTextNode(inf.d))}return}
-  if(view==='keys'){$('sub').textContent=kText;$('sub').style.whiteSpace='pre-line';return}
-  if(inf){var b=document.createElement('b');b.textContent=inf.t;ie.appendChild(b);ie.appendChild(document.createTextNode(inf.d))}
-  if(view==='inputkey'){$('sub').textContent='Input key';return}
-  if(view==='confirm-home'||view==='confirm-uninstall'){$('sub').textContent=view==='confirm-uninstall'?'Remove CleanYourTV?':'Switch Home?';return}
-  if(!offline&&st){var m=[];m.push('Launcher '+st.frontend.version+' · service '+st.service.version);
-    if(st.checkError)m.push('Updates: '+st.checkError);else if(st.release)m.push('Latest release '+st.release.version);
-    $('sub').textContent=m.join('\n');$('sub').style.whiteSpace='pre-line'}
-  else $('sub').textContent=offline?'The service is not running. Set it up to replace LG’s Home, take over the Input key and keep everything up to date.':'';
+  if(view==='notifyhow'||view==='voicehow'){ui('sub',kText);$('sub').style.whiteSpace='pre-line';$('sub').style.wordBreak='break-all';return}
+  if(view==='notifyapi'){ui('sub','Network notifications');return}
+  if(view==='models'){ui('sub','Choose the model that answers');return}
+  if(view==='agents'){ui('sub','Choose the Home Assistant agent');return}
+  if(view==='channel'){ui('sub','Where updates come from');return}
+  if(view==='livetv'){ui('sub','Live TV: your own playlist');return}
+  if(view==='confirm-live-reset'){ui('sub','Remove the playlist?');return}
+  if(view==='theme'){ui('sub','Choose how Home looks. The change shows the next time you open Home.');return}
+  if(view==='accent'){ui('sub','The colour of the focus ring and highlights');return}
+  if(view==='voice'){var vv=vo||{},ls=vv.last?(vv.last.text?t('Last heard')+': \u201C'+vv.last.text+'\u201D'+(vv.last.ms?' ('+(vv.last.ms/1000).toLocaleString(document.documentElement.lang)+' '+t('s')+')':'')+(vv.last.error?'\n'+t('Not sent')+': '+CYTV_I18N.error(vv.last.error):''):t('Last try')+': '+t(vv.last.state)+(vv.last.error?'\n'+CYTV_I18N.error(vv.last.error):'')):'';
+    ui('sub','Voice \u00B7 '+t(vv.engine||'')+(ls?'\n'+t(ls):''));$('sub').style.whiteSpace='pre-line';if(inf){var b2=document.createElement('b');b2.textContent=t(inf.t);ie.appendChild(b2);ie.appendChild(document.createTextNode(inf.d))}return}
+  if(view==='keys'){ui('sub',kText);$('sub').style.whiteSpace='pre-line';return}
+  if(inf){var b=document.createElement('b');b.textContent=t(inf.t);ie.appendChild(b);ie.appendChild(document.createTextNode(inf.d))}
+  if(view==='inputkey'){ui('sub','Input key');return}
+  if(view==='confirm-home'||view==='confirm-uninstall'){ui('sub',view==='confirm-uninstall'?'Remove CleanYourTV?':'Switch Home?');return}
+  if(!offline&&st){var m=[];m.push(t('Launcher '+st.frontend.version)+' · '+t('service '+st.service.version));
+    if(st.checkError)m.push(CYTV_I18N.format('Updates: {0}',[CYTV_I18N.error(st.checkError)]));else if(st.release)m.push('Latest release '+st.release.version);
+    ui('sub',m.join('\n'));$('sub').style.whiteSpace='pre-line'}
+  else ui('sub',offline?'The service is not running. Set it up to replace LG’s Home, take over the Input key and keep everything up to date.':'');
 }
 function next(dir){var n=rows.length,i=idx;do{i=(i+dir+n)%n}while(rows[i].sep);idx=i;draw()}
 function act(){var r=rows[idx];if(r&&r.fn&&!(st&&st.job&&st.job.state==='working'&&r.dim))r.fn()}
 
-function aiHelp(){return 'Chat with a language model through OpenRouter. Run these on the TV (ssh):\n\ncurl -X POST localhost:8765/api/voice/set -d \'{"llm":{"key":"sk-or-...","model":"openrouter/auto"}}\'\ncurl -X POST localhost:8765/api/voice/set -d \'{"llm":{"enabled":true}}\'\n\nOptional: "system" sets the instructions. Ask by text from anywhere on the TV:\ncurl -X POST localhost:8765/api/voice/ask -d \'{"text":"What is the capital of Peru?"}\'\n\nSpoken and typed questions go to OpenRouter and the model you chose; no audio does. The key stays on the TV.\n\nHome Assistant (Assist), with a long-lived access token:\ncurl -X POST localhost:8765/api/voice/set -d \'{"ha":{"url":"http://homeassistant.local:8123","token":"..."}}\'\nOptional: "route" is ha-first, ha-only or ai-only; "selfSigned":true accepts a self-signed certificate; "agent" is a conversation entity.'}
+function curlExample(action,json){return 'curl -H "X-CYTV-Token: $(node /media/developer/cleanyourtv/security.js token)" -X POST localhost:8765/api/voice/'+action+" -d '"+json+"'"}
+function aiHelp(){return t('OpenRouter setup from SSH on the TV:')+'\n\n'+curlExample('set','{"llm":{"key":"sk-or-...","model":"openrouter/auto"}}')+'\n'+curlExample('set','{"llm":{"enabled":true}}')+'\n\n'+t('Use "system" for custom instructions. Ask by text:')+'\n'+curlExample('ask','{"text":"What is the capital of Peru?"}')+'\n\n'+t('Only question text goes to OpenRouter and the model provider, never audio. The key is stored on the TV.')+'\n\n'+t('Home Assistant (Assist), with a long-lived access token:')+'\n'+curlExample('set','{"ha":{"url":"http://homeassistant.local:8123","token":"..."}}')+'\n'+t('Optional: "route" is ha-first, ha-only or ai-only; "selfSigned":true accepts a self-signed certificate; "agent" is a conversation entity.')}
 function liveRefresh(){api('/api/live/status').then(function(r){lv=r;if(view==='livetv'){build();if(idx>=rows.length)idx=0;draw()}},function(){})}
 function openLiveTv(){api('/api/live/status').then(function(r){lv=r;push('livetv')},function(){lv=null;push('livetv')})}
 function openLivePair(){
   shareMode='live';
   push('share');$('share').style.display='block';$('shareurl').textContent='';$('qrbox').style.visibility='hidden';
-  $('share').querySelector('h2').textContent='Set up Live TV';
-  $('share').querySelector('ol').innerHTML='<li>Phone on the <b>same Wi-Fi</b> as the TV.</li><li>Scan the code with the camera.</li><li>Enter the <b>code</b> below and your playlist address.</li>';
-  $('sharemsg').textContent='Preparing\u2026';
+  $('share').querySelector('h2').textContent=t('Set up Live TV');
+  $('share').querySelector('ol').innerHTML=CYTV_I18N.html('<li>Phone on the <b>same Wi-Fi</b> as the TV.</li><li>Scan the code with the camera.</li><li>Enter the <b>code</b> below and your playlist address.</li>',document.documentElement.lang);
+  ui('sharemsg','Preparing\u2026');
   api('/api/live/pair',{}).then(function(r){
     if(view!=='share')return;
-    drawQr(r.url);$('qrbox').style.visibility='visible';$('shareurl').textContent=r.url+'   code '+r.code;
-    $('sharemsg').textContent='The page stays open for ten minutes. It is not encrypted: the playlist address, which may hold an access key, travels over your Wi-Fi.';
-    (function poll(n){if(view!=='share'||shareMode!=='live')return;api('/api/live/status').then(function(s2){if(s2.configured&&(!lv||!lv.configured||s2.channels!==lv.channels)){lv=s2;closeShare();banner('Playlist saved','ok');return}if(n<300)setTimeout(function(){poll(n+1)},2000)},function(){setTimeout(function(){poll(n+1)},3000)})})(0)},function(){$('sharemsg').textContent='The service did not answer.'})}
+    drawQr(r.url);$('qrbox').style.visibility='visible';$('shareurl').textContent=r.url+'   '+t('code')+' '+r.code;
+    ui('sharemsg','The page stays open for ten minutes. It is not encrypted: the playlist address, which may hold an access key, travels over your Wi-Fi.');
+    (function poll(n){if(view!=='share'||shareMode!=='live')return;api('/api/live/status').then(function(s2){if(s2.configured&&(!lv||!lv.configured||s2.channels!==lv.channels)){lv=s2;closeShare();banner('Playlist saved','ok');return}if(n<300)setTimeout(function(){poll(n+1)},2000)},function(){setTimeout(function(){poll(n+1)},3000)})})(0)},function(){ui('sharemsg','The service did not answer.')})}
 function openTheme(){
   banner('Loading themes\u2026','work');
-  api('/api/theme/list').then(function(r){if(r.error){banner(r.error,'err');return}banner('');th=r;push('theme');for(var k=0;k<rows.length;k++)if(rows[k].sub&&/^selected/.test(rows[k].sub)){idx=k;draw();break}},function(){banner('The service did not answer','err')})}
+  api('/api/theme/list').then(function(r){if(r.error){banner(r.error,'err');return}banner('');th=r;push('theme');for(var k=0;k<rows.length;k++)if(rows[k].sub&&rows[k].sub.indexOf(t('selected'))===0){idx=k;draw();break}},function(){banner('The service did not answer','err')})}
 function setTheme(b){themeCall('/api/theme/set',b,'Theme applied. Open Home to see it.')}
 function themeCall(path,b,msg,back){api(path,b).then(function(r){if(r.error){banner(r.error,'err');return}th=r;banner(msg,'ok');if(back)pop();else{build();draw()}},function(){banner('The service did not answer','err')})}
 function openChannel(){
@@ -302,7 +307,7 @@ function openModels(){
     banner('');mdl=[{id:'openrouter/auto',name:'Auto (OpenRouter picks)',price:null}].concat(r.picks);
     var cur=((vo||{}).llm||{}).model;if(cur&&!mdl.some(function(x){return x.id===cur}))mdl.splice(1,0,{id:cur,name:cur,price:null});
     push('models');
-    for(var k=0;k<rows.length;k++)if(rows[k].sub&&/selected$/.test(rows[k].sub)){idx=k;draw();break}
+    for(var k=0;k<rows.length;k++)if(rows[k].sub&&rows[k].sub.slice(-t('selected').length)===t('selected')){idx=k;draw();break}
   },function(){banner('The service did not answer','err')})}
 function haTest(){
   banner('Asking Home Assistant\u2026','work');
@@ -312,26 +317,26 @@ function openAgents(){
   api('/api/voice/ha-agents').then(function(r){
     if(r.error){banner(r.error,'err');return}
     banner('');agl=r.agents||[];push('agents');
-    var cur=((vo||{}).ha||{}).agent;for(var k=0;k<rows.length;k++)if(rows[k].sub&&/selected$/.test(rows[k].sub)){idx=k;draw();break}
+    var cur=((vo||{}).ha||{}).agent;for(var k=0;k<rows.length;k++)if(rows[k].sub&&rows[k].sub.slice(-t('selected').length)===t('selected')){idx=k;draw();break}
   },function(){banner('The service did not answer','err')})}
 function pickAgent(id){api('/api/voice/set',{ha:{agent:id}}).then(function(x){if(x.error){banner(x.error,'err');return}vo=x;banner(id?'Agent: '+id:'Default agent','ok');pop()},function(){banner('The service did not answer','err')})}
 function pickModel(id){api('/api/voice/set',{llm:{model:id}}).then(function(x){if(x.error){banner(x.error,'err');return}vo=x;banner('Model: '+id,'ok');pop()},function(){banner('The service did not answer','err')})}
 function openPair(){
   shareMode='pair';pairBase=(vo&&vo.pairedAt)||0;
   push('share');$('share').style.display='block';$('shareurl').textContent='';$('qrbox').style.visibility='hidden';
-  $('share').querySelector('h2').textContent='Set up from your phone';
-  $('share').querySelector('ol').innerHTML='<li>Phone on the <b>same Wi-Fi</b> as the TV.</li><li>Scan the code with the camera.</li><li>Enter your <b>OpenRouter key</b> and model, or your <b>Home Assistant</b> address and access token, and tap <b>Save</b>.</li>';
-  $('sharemsg').textContent='Preparing\u2026';
+  $('share').querySelector('h2').textContent=t('Set up from your phone');
+  $('share').querySelector('ol').innerHTML=CYTV_I18N.html('<li>Phone on the <b>same Wi-Fi</b> as the TV.</li><li>Scan the code with the camera.</li><li>Enter your <b>OpenRouter key</b> and model, or your <b>Home Assistant</b> address and access token, and tap <b>Save</b>.</li>',document.documentElement.lang);
+  ui('sharemsg','Preparing\u2026');
   api('/api/voice/pair',{}).then(function(r){
     if(view!=='share')return;
     drawQr(r.url);$('qrbox').style.visibility='visible';$('shareurl').textContent=r.url;
-    $('sharemsg').textContent='The page stays open for ten minutes, or until you save. It is not encrypted: the key travels over your Wi-Fi, so use a network you trust.';
-    pollPair(0)},function(){$('sharemsg').textContent='The service did not answer.'})}
+    ui('sharemsg','The page stays open for ten minutes, or until you save. It is not encrypted: the key travels over your Wi-Fi, so use a network you trust.');
+    pollPair(0)},function(){ui('sharemsg','The service did not answer.')})}
 function pollPair(n){
   if(view!=='share'||shareMode!=='pair')return;
   api('/api/voice/status').then(function(v){
     if(v.pairedAt>pairBase){vo=v;closeShare();banner('Saved','ok');return}
-    if(!v.pairing&&n>1){$('sharemsg').textContent='The page has closed. Close this and try again.';return}
+    if(!v.pairing&&n>1){ui('sharemsg','The page has closed. Close this and try again.');return}
     setTimeout(function(){pollPair(n+1)},2000)},function(){setTimeout(function(){pollPair(n+1)},3000)})}
 function voiceRefresh(){clearTimeout(pollT);api('/api/voice/status').then(function(v){vo=v;var j=v.job||{};
   if(j.state==='working')banner(j.message,'work');else if(j.state==='error')banner(j.message,'err');else if(v.listening)banner('Listening…','work');else banner('');
@@ -363,14 +368,14 @@ function offlineCheck(){
     banner(r.updateTo?('Version '+r.updateTo+' is available; this one is '+r.installed+'.'):('Up to date ('+r.installed+').'),r.updateTo?'ok':'')})}
 function offlineUpdate(){
   if(!upd)return;banner('Updating to '+upd.updateTo+'\u2026','work');
-  rootExec('rm -f /tmp/cytv-selfupdate.log; nohup node '+SVC+'/helper/selfupdate.js install > /tmp/cytv-selfupdate.log 2>&1 &').then(function(){pollUpdate(0)})}
+  rootRun('rm -f "$R/selfupdate.log"; nohup node '+SVC+'/helper/selfupdate.js install > "$R/selfupdate.log" 2>&1 &').then(function(){pollUpdate(0)})}
 function pollUpdate(n){
-  rootExec('tail -n 3 /tmp/cytv-selfupdate.log 2>/dev/null').then(function(m){
+  rootRun('tail -n 3 "$R/selfupdate.log" 2>/dev/null').then(function(m){
     var t=execOut(m).out.trim(),last=t.split('\n').pop();
-    if(/^DONE/.test(last)){upd=null;banner(last.replace(/^DONE /,''),'ok');build();draw();return}
+    if(/^DONE/.test(last)){upd=null;banner(CYTV_I18N.logLine(last.replace(/^DONE /,'')),'ok');build();draw();return}
     if(/^ERROR/.test(last)){banner('Update failed: '+last.replace(/^ERROR /,''),'err');return}
-    if(n>120){banner('The update is taking too long. Log: /tmp/cytv-selfupdate.log on the TV.','err');return}
-    if(last)banner('Updating\u2026 '+last,'work');
+    if(n>120){banner('The update is taking too long. Log: /media/developer/cleanyourtv/run/selfupdate.log on the TV.','err');return}
+    if(last)banner(CYTV_I18N.format('Updating… {0}',[CYTV_I18N.logLine(last)]),'work');
     setTimeout(function(){pollUpdate(n+1)},2000)})}
 /* the remote's Input and Home buttons differ between remotes and firmware: learn their codes from the hook, then test */
 function kShow(text,list){kText=text;kRows=list;build();idx=0;draw()}
@@ -418,30 +423,30 @@ function drawQr(url){
   for(var r=0;r<n;r++)for(var c=0;c<n;c++)if(q.isDark(r,c))g.fillRect((c+4)*cell,(r+4)*cell,cell,cell)}
 function openShare(){
   shareMode='log';
-  push('share');$('share').querySelector('h2').textContent='Share the log';$('share').querySelector('ol').innerHTML='<li>Phone on the <b>same Wi-Fi</b> as the TV.</li><li>Scan the code with the camera.</li><li>Tap <b>Copy</b> on the page and paste it into your message.</li>';$('share').style.display='block';$('shareurl').textContent='';$('qrbox').style.visibility='hidden';
-  $('sharemsg').textContent='Preparing the report\u2026';
-  rootExec('rm -f /tmp/cytv-sharelog.json; nohup node '+SVC+'/helper/sharelog.js > /tmp/cytv-sharelog.out 2>&1 &').then(function(){pollShare(0)})}
+  push('share');$('share').querySelector('h2').textContent=t('Share the log');$('share').querySelector('ol').innerHTML=CYTV_I18N.html('<li>Phone on the <b>same Wi-Fi</b> as the TV.</li><li>Scan the code with the camera.</li><li>Tap <b>Copy</b> on the page and paste it into your message.</li>',document.documentElement.lang);$('share').style.display='block';$('shareurl').textContent='';$('qrbox').style.visibility='hidden';
+  ui('sharemsg','Preparing the report\u2026');
+  rootRun('rm -f "$R/sharelog.json"; nohup node '+SVC+'/helper/sharelog.js > "$R/sharelog.out" 2>&1 &').then(function(){pollShare(0)})}
 function pollShare(n){
   if(view!=='share')return;
-  rootExec('cat /tmp/cytv-sharelog.json 2>/dev/null').then(function(m){
+  rootRun('cat "$R/sharelog.json" 2>/dev/null').then(function(m){
     var st=null;try{st=JSON.parse(JSON.parse(m).stdoutString||'null')}catch(e){}
-    if(st&&st.url){drawQr(st.url);$('qrbox').style.visibility='visible';$('shareurl').textContent=st.url;$('sharemsg').textContent='The page is open for ten minutes. It lists versions, the setup log and the service log; addresses and URL paths are masked.';return}
-    if(n>45){$('sharemsg').textContent='Could not prepare the report (is the Homebrew Channel installed?).';return}
+    if(st&&st.url){drawQr(st.url);$('qrbox').style.visibility='visible';$('shareurl').textContent=st.url;ui('sharemsg','The page is open for ten minutes. It lists versions, the setup log and the service log; addresses and URL paths are masked.');return}
+    if(n>45){ui('sharemsg','Could not prepare the report (is the Homebrew Channel installed?).');return}
     setTimeout(function(){pollShare(n+1)},1000)})}
-function closeShare(){$('share').style.display='none';if(shareMode==='live'){pop();liveRefresh();return}if(shareMode==='pair'){api('/api/voice/pair-stop',{}).catch(function(){});pop();voiceRefresh();return}rootExec('pkill -f "[s]harelog.js"; rm -f /tmp/cytv-sharelog.json');pop()}
+function closeShare(){$('share').style.display='none';if(shareMode==='live'){pop();liveRefresh();return}if(shareMode==='pair'){api('/api/voice/pair-stop',{}).catch(function(){});pop();voiceRefresh();return}rootRun('pkill -f "[s]harelog.js"; rm -f "$R/sharelog.json"');pop()}
 function doSetup(force){forceOffer=false;
   banner('Setting up\u2026 the screen blinks once while LG\u2019s system restarts','work');
   var flags=(setup.debloat?'--debloat':'--no-debloat')+' '+(setup.inputKey?'--input-key':'--no-input-key')+(force?' --force':'');
-  rootExec('rm -f /media/developer/cytv-setup.log*; nohup sh '+SVC+'/bootstrap.sh install '+flags+' > /media/developer/cytv-setup.log 2>&1 &').then(function(m){
+  rootRun('rm -f "$R/setup.log" "$R/setup.log.service"; nohup sh '+SVC+'/bootstrap.sh install '+flags+' > "$R/setup.log" 2>&1 &').then(function(m){
     var o={};try{o=JSON.parse(m)}catch(e){}
     if(o.returnValue===false){banner('Could not start the setup: '+(o.errorText||'no answer from the Homebrew Channel service (is it installed and up to date?)'),'err');return}
     waitUp(0)})}
-function logTail(cb){rootExec('tail -n 3 /media/developer/cytv-setup.log 2>/dev/null').then(function(m){var o={};try{o=JSON.parse(m)}catch(e){}cb(String(o.stdoutString||'').replace(/\[cleanyourtv\] /g,'').trim())})}
+function logTail(cb){rootRun('tail -n 3 "$R/setup.log" 2>/dev/null').then(function(m){var o={};try{o=JSON.parse(m)}catch(e){}cb(String(o.stdoutString||'').replace(/\[cleanyourtv\] /g,'').trim())})}
 function waitUp(n){api('/api/manager/status').then(function(s0){offline=false;banner('');load();if(!(s0.keys&&s0.keys.learned)&&s0.options&&s0.options.inputKey)setTimeout(function(){api('/api/manager/status').then(function(s){st=s;openKeys('input')})},1500)},function(){
   logTail(function(t){
     if(/ERROR|rolled back/.test(t)){forceOffer=/looks different/.test(t);build();draw();banner('Setup stopped: '+t.split('\n').pop().replace(/^ERROR: /,''),'err');return}
-    if(n>90){banner('The service did not start. Log: /media/developer/cytv-setup.log on the TV. '+t.split('\n').pop(),'err');return}
-    if(t)banner('Setting up\u2026 '+t.split('\n').pop(),'work');
+    if(n>90){banner(CYTV_I18N.format('The service did not start. Log: /media/developer/cleanyourtv/run/setup.log on the TV. {0}',[CYTV_I18N.logLine(t.split('\n').pop())]),'err');return}
+    if(t)banner(CYTV_I18N.format('Setting up… {0}',[CYTV_I18N.logLine(t.split('\n').pop())]),'work');
     setTimeout(function(){waitUp(n+1)},2000)})})}
 
 document.addEventListener('keydown',function(e){var k=e.keyCode;
@@ -451,5 +456,5 @@ document.addEventListener('keydown',function(e){var k=e.keyCode;
 document.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('#shareclose')){closeShare();return}var r=e.target.closest&&e.target.closest('.row');if(r){idx=+r.getAttribute('data-i');draw();act()}});
 document.addEventListener('mousemove',function(e){var r=e.target.closest&&e.target.closest('.row');if(r&&+r.getAttribute('data-i')!==idx){idx=+r.getAttribute('data-i');draw()}});
 document.addEventListener('webOSRelaunch',function(){view='main';idx=0;idxStack=[];load()});
-banner('Reading status…','work');load();
+ui('shareclose','Close');banner('Reading status…','work');load();
 </script></body></html>

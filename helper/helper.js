@@ -1,9 +1,10 @@
 // Root service of CleanYourTV: bridges the launcher web app to luna, serves app icons, runs Live TV and picture
 // notifications, keeps the Input-key picker alive and hosts the manager API. Listens on 127.0.0.1 only.
 const http = require('http'), fs = require('fs'), path = require('path'), cp = require('child_process');
-const VERSION = '1.5.12';
+const VERSION = '1.5.13';
 const PORT = 8765, DIR = '/media/developer/cleanyourtv', CONF = DIR + '/config.json', USAGE = DIR + '/usage.json';
 const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbin:' + (process.env.PATH || '') });
+const security = require('./security'), apiToken = security.token();
 
 function luna(uri, payload) {
   return new Promise(res => {
@@ -86,21 +87,22 @@ let notifyApi = null;
 try { if (notify) notifyApi = require('./notifyapi').create({ notify, readConf, writeConf }); } catch (e) { console.error('notification api module failed:', e.message); }
 let manager = null;
 try { manager = require('./manager').create({ luna, readConf, writeConf, inputhook, VERSION, notifyApi, voice, pickerShown: () => pickerShownAt }); } catch (e) { console.error('manager module failed:', e.message); }
-const body = req => new Promise(r => { let b = ''; req.on('data', c => b += c); req.on('end', () => { try { r(JSON.parse(b || '{}')); } catch (_) { r({}); } }); });
+const body = req => new Promise((resolve, reject) => { let b = '', size = 0; req.on('data', c => { size += c.length; if (size > 65536) { req.destroy(); reject(new Error('request too large')); } else b += c; }); req.on('error', reject); req.on('end', () => { try { resolve(JSON.parse(b || '{}')); } catch (_) { reject(new Error('invalid JSON')); } }); });
 
 http.createServer(async (req, res) => {
-  // Our apps are local files (their requests carry Origin "null"); curl and scripts send no Origin. A web page opened in the
-  // TV's browser has an http(s) origin and is refused, so it cannot drive this root service.
+  // Origin is defence in depth: sandboxed web pages can also send "null". Every request needs the local capability.
   let origin = req.headers.origin;
   const rawOrigin = origin;
   // webOS 6 sends "file://<appId>-webos" for local apps instead of "null": accept that for our own apps and the Home slot only
   if (/^file:\/\/(com\.webos\.app\.home|com\.cleanyourtv\.(manager|picker|notify|live))-webos$/.test(origin || '')) origin = 'null';
-  if (origin !== undefined && origin !== 'null') { console.log('refused origin ' + origin + ' ' + req.method + ' ' + req.url.slice(0, 60)); res.writeHead(403, { 'content-type': 'application/json' }); return res.end('{"error":"origin not allowed"}'); }
+  if (origin !== undefined && origin !== 'null') { res.writeHead(403, { 'content-type': 'application/json' }); return res.end('{"error":"origin not allowed"}'); }
   // Chromium 79 (webOS 6) compares the answer with its own serialisation of a file origin, so for those origins echoing fails CORS: answer * there.
   // Only origins accepted above get this far.
   if (origin === 'null') { res.setHeader('Access-Control-Allow-Origin', rawOrigin === 'null' ? 'null' : '*'); res.setHeader('Vary', 'Origin'); }
-  res.setHeader('Access-Control-Allow-Headers', 'content-type');
+  res.setHeader('Access-Control-Allow-Headers', 'content-type, x-cytv-token');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+  if (!security.authorized(req, apiToken)) { res.writeHead(401, { 'content-type': 'application/json' }); return res.end('{"error":"API authorization required"}'); }
   const json = (o, c) => { res.writeHead(c || 200, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
   const u = req.url.split('?')[0];
   try {
