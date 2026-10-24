@@ -42,6 +42,7 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
     if (q.url === '/guide.xml.gz') return r.end(zlib.gzipSync(Buffer.from(guideXml)));
     if (q.url === '/guide-hdr.xml.gz') { r.writeHead(200, { 'content-encoding': 'gzip' }); return r.end(zlib.gzipSync(Buffer.from(guideXml))); }
     if (q.url === '/guide-broken.gz') { r.writeHead(200, { 'content-encoding': 'gzip' }); r.write(zlib.gzipSync(Buffer.from(guideXml)).slice(0, 40)); return setTimeout(() => q.destroy(), 30); }
+    if (q.url === '/guide.min.xml') return r.end(guideXml.replace(/\n/g, ''));
     r.end(q.method); }).listen(0, '127.0.0.1');
   await new Promise(r => srv.on('listening', r));
   const port = srv.address().port;
@@ -120,6 +121,9 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
     'guide: start/stop before channel, exact ids, display-name ids and punctuation-only differences all match');
   const e2 = await live.loadEpg('http://127.0.0.1:' + port + '/guide.xml.gz', chans);
   ok(e2.count === 3, 'guide: a .xml.gz source without a gzip content-encoding header loads');
+  const e4 = await live.loadEpg('http://127.0.0.1:' + port + '/guide.min.xml', chans);
+  ok(e4.count === 3 && e4.byId.ch1[0][2] === 'News' && e4.byId['tvpoland.news'][1][2] === 'Late',
+    'guide: a minified single-line XMLTV loads with bounded memory and keeps its last programme');
   const e3 = await live.loadEpg('http://127.0.0.1:' + port + '/guide-hdr.xml.gz', chans);
   ok(e3.count === 3, 'guide: a .xml.gz sent with a proper content-encoding header is not decoded twice');
   const broken = live.loadEpg('http://127.0.0.1:' + port + '/guide-broken.gz', chans);

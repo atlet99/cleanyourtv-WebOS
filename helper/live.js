@@ -222,11 +222,14 @@ async function loadEpg(url, channels) {
   await new Promise((resolve, reject) => {
     let n = 0;
     stream.on('data', chunk => {
-      buf += chunk; let i;
-      while ((i = buf.indexOf('\n')) >= 0) { handle(buf.slice(0, i)); buf = buf.slice(i + 1); }
+      buf += chunk; let p;
+      // segment on <programme boundaries: a minified guide without any newlines must not pile up in memory, and a
+      // line holding several programmes is still parsed one by one. Between chunks at most one programme is buffered.
+      while ((p = buf.indexOf('<programme', 1)) > 0) { handle(buf.slice(0, p)); buf = buf.slice(p); }
       if (++n % 40 === 0) { stream.pause(); setImmediate(() => stream.resume()); }   // leave CPU for the UI
     });
-    stream.on('end', resolve); stream.on('error', reject);
+    stream.on('end', () => { if (buf) handle(buf); resolve(); });   // the last programme needs no trailing newline
+    stream.on('error', reject);
   });
   for (const id in byId) byId[id].sort((a, b) => a[0] - b[0]);
   return { v: 4, fetchedAt: Date.now(), count, byId };
