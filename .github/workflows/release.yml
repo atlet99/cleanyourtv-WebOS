@@ -40,7 +40,7 @@ jobs:
         if: steps.plan.outputs.publish == 'true'
         env:
           PRIVATE_KEY: ${{ secrets.CYTV_RELEASE_PRIVATE_KEY }}
-          PUBLIC_KEY: ${{ vars.CYTV_RELEASE_PUBLIC_KEY_PEM }}
+          PUBLIC_KEY: ${{ secrets.CYTV_RELEASE_PUBLIC_KEY_PEM || vars.CYTV_RELEASE_PUBLIC_KEY_PEM }}
         run: |
           if [ -z "$PRIVATE_KEY" ] || [ -z "$PUBLIC_KEY" ]; then
             echo 'Configure CYTV_RELEASE_PRIVATE_KEY and CYTV_RELEASE_PUBLIC_KEY_PEM; stable releases must be signed'
@@ -62,7 +62,7 @@ jobs:
           CYTV_RELEASE_VERSION: ${{ steps.plan.outputs.version }}
           CYTV_BUILD: ${{ github.sha }}
           PRIVATE_KEY: ${{ secrets.CYTV_RELEASE_PRIVATE_KEY }}
-          PUBLIC_KEY: ${{ vars.CYTV_RELEASE_PUBLIC_KEY_PEM }}
+          PUBLIC_KEY: ${{ secrets.CYTV_RELEASE_PUBLIC_KEY_PEM || vars.CYTV_RELEASE_PUBLIC_KEY_PEM }}
         run: |
           set -euo pipefail
           umask 077
