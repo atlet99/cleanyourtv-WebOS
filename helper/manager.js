@@ -47,7 +47,7 @@ function setHome(enabled) {
 }
 
 function create(ctx) {
-  const { luna, readConf, writeConf, inputhook, VERSION, pickerShown, notifyApi, voice } = ctx;
+  const { luna, readConf, writeConf, inputhook, picker, VERSION, pickerShown, notifyApi, voice } = ctx;
   const keys = () => { const k = Object.assign({ input: '', home: '', voice: '', guide: '', learned: false }, readConf().keys || {}); return Object.assign(k, { inputIsDefault: !k.input, input: k.input || '241' }); };
   let job = { state: 'idle', message: '', at: 0 }, release = null, releaseAt = 0, releaseErr = '', frontendOk = null, checking = false;
   const setJob = (state, message) => { job = { state, message, at: Date.now() }; };
@@ -108,7 +108,7 @@ function create(ctx) {
         updateTo: lat && differs(lat.frontend, fe.version, lat.build, frontendBuild()) ? lat.frontend : null },
       channel: channel(), release: lat ? { version: lat.version, frontend: lat.frontend, service: lat.service, build: lat.build, test: lat.test, notes: lat.notes } : null, checkedAt: releaseAt, checking, checkError: releaseErr,
       options: options(), voice: voice ? (v => ({ installed: v.installed, enabled: v.enabled }))(voice.status()) : null, notifyApi: notifyApi ? { enabled: notifyApi.info().enabled, port: notifyApi.info().port } : { enabled: false }, home: { enabled: !fs.existsSync(D + '/DISABLE'), fullhome: fs.existsSync('/usr/palm/applications/com.webos.app.fullhome'), ours: (() => { try { return fs.readFileSync('/proc/mounts', 'utf8').includes(' /usr/palm/applications/com.webos.app.home '); } catch (_) { return false; } })() },
-      inputhook: inputhook.status(keys().input), keys: keys(), job, repo: repoUrl().replace(/^https?:\/\/[^/]+\/repos\//, '').replace(/\/releases.*$/, ''),
+      inputhook: inputhook.status(keys().input), picker: picker ? picker.status() : { mode: 'ondemand' }, keys: keys(), job, repo: repoUrl().replace(/^https?:\/\/[^/]+\/repos\//, '').replace(/\/releases.*$/, ''),
     };
   }
 

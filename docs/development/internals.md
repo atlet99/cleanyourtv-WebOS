@@ -6,7 +6,7 @@
 |---|---|---|
 | The **service** (`helper.js` and modules) | Node.js, root, started by the boot script | Listens on `127.0.0.1:8765`; bridges the web pages to `luna-send` (LG's service bus), serves app icons, runs Live TV, notifications, voice, the manager API and the input hook. |
 | The **launcher** (`app/index.html`) | A web app in LG's web runtime, mounted as LG's Home | Reads apps and settings from the service. |
-| **Manager**, **picker**, **notify** | Web apps installed from the package | The picker and notify apps are hidden; the service starts them. |
+| **Manager**, **picker**, **notify** | Web apps installed from the package | The manager opens from the launcher. The picker runs on demand: the Input key starts it, the page has it closed after use. The notify app is started by the service when a notification arrives and is released afterwards. |
 | The **input hook** | Injected into LG's input processes | Runs a command when a bound remote key is pressed. |
 
 ## How the launcher becomes Home

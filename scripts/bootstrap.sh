@@ -37,7 +37,7 @@ ensure_apps() {
   for id in com.cleanyourtv.picker com.cleanyourtv.notify; do
     [ -d /media/developer/apps/usr/palm/applications/$id ] && ! luna com.webos.applicationManager/getAppInfo "{\"id\":\"$id\"}" | grep -q '"returnValue": true' && missing=1
   done
-  [ $NOTIFY_CHANGED = 1 ] && missing=1
+  [ $WINDOW_CHANGED = 1 ] && missing=1
   [ $missing = 0 ] && return 0
   say "registering the overlay apps (the screen blinks once)"
   (sleep 3; pkill -9 -f /usr/palm/applications/airplay/LunaExecutable) </dev/null >/dev/null 2>&1 &
@@ -72,19 +72,21 @@ model=$(echo "$info" | sed -n 's/.*"modelName": *"\([^"]*\)".*/\1/p')
 fw=$(echo "$info" | sed -n 's/.*"firmwareVersion": *"\([^"]*\)".*/\1/p')
 sdk=$(echo "$info" | sed -n 's/.*"sdkVersion": *"\([^"]*\)".*/\1/p')
 
-# The notification app's window type. "topui" is accepted from webOS 25 (SDK 10) on, as far as it has been tried; older TVs refuse to
+# The overlay apps' window type. "topui" is accepted from webOS 25 (SDK 10) on, as far as it has been tried; older TVs refuse to
 # launch the app with it ("Unsupported Application Type") and need "overlay", also when the SDK version cannot be read.
-# The package always ships "topui", so this runs on every install and update; a change needs the system app manager to
-# read the app again (ensure_apps restarts it, the screen blinks once).
-NOTIFY_CHANGED=0
-fix_notify_window() {
-  NA=/media/developer/apps/usr/palm/applications/com.cleanyourtv.notify/appinfo.json
+# The package ships the notification app as "topui" and the Inputs picker as "overlay"; this runs on every install and
+# update, and a change needs the system app manager to read the app again (ensure_apps restarts it, the screen blinks once).
+WINDOW_CHANGED=0
+fix_window_type() {   # $1: installed app directory, $2: human-readable name for the log
+  NA=$1/appinfo.json
   [ -f $NA ] || return 0
   major=${sdk%%.*}; case "$major" in ''|*[!0-9]*) major=0 ;; esac
   want=overlay; [ "$major" -ge 10 ] && want=topui
-  if $J wintype "$NA" "$want"; then NOTIFY_CHANGED=1; say "picture notifications use the $want window on this TV (webOS SDK ${sdk:-unknown})"; fi
+  if $J wintype "$NA" "$want"; then WINDOW_CHANGED=1; say "$2 uses the $want window on this TV (webOS SDK ${sdk:-unknown})"; fi
 }
-fix_notify_window
+APPS_ROOT=/media/developer/apps/usr/palm/applications
+fix_window_type $APPS_ROOT/com.cleanyourtv.notify "picture notifications"
+fix_window_type $APPS_ROOT/com.cleanyourtv.picker "the Inputs picker"
 
 if [ "$MODE" = install ]; then
   say "TV: ${model:-unknown model}, firmware ${fw:-?}, webOS SDK ${sdk:-?}"
@@ -176,7 +178,8 @@ if [ "$MODE" = update ]; then
   fi
   say "service $WANT is running"
   ensure_apps
-  # the overlay apps and the launcher may have new pages: restart the hidden picker (the service starts it again) and reload Home
+  # the overlay apps and the launcher may have new pages: close the picker so the next Input press uses the new page
+  # (nothing starts it in the background any more, see helper/picker.js) and reload Home
   luna-send -n 1 -w 3000 luna://com.webos.applicationManager/closeByAppId '{"id":"com.cleanyourtv.picker"}' </dev/null >/dev/null 2>&1
   if [ "$FRONTEND_NEW" = 1 ] && grep -q " $HOME_DIR " /proc/mounts; then
     sh $D/reload-home.sh </dev/null

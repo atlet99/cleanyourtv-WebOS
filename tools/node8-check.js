@@ -344,6 +344,42 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
   const gen = require(path.join(root, 'tools', 'theme-docs.js')), docs = fs.readFileSync(path.join(root, 'docs', 'themes.md'), 'utf8');
   ok(docs.indexOf(gen.table()) >= 0, 'docs/themes.md holds the table generated from the schema (run: node tools/theme-docs.js)');
 
+  // 8. the Inputs picker runs on demand only: nothing starts or keeps it in the background (remote freeze, issue #5)
+  {
+    const calls = [];
+    const luna = async (uri, p) => { calls.push([uri, p]); return { returnValue: true }; };
+    const picker = require(path.join(helper, 'picker'));
+    ok(picker.status().mode === 'ondemand' && !picker.status().releasedAt, 'picker status reports the on-demand mode with no release yet');
+    const r = await picker.release(luna);
+    ok(calls.length === 1 && calls[0][0] === 'luna://com.webos.applicationManager/closeByAppId' && calls[0][1].id === 'com.cleanyourtv.picker' && r.returnValue === true,
+      'picker release closes only the picker app');
+    ok(picker.status().releasedAt > 0, 'picker remembers when it was last released');
+    calls.length = 0;
+    await new Promise(done => setTimeout(done, 120));
+    ok(calls.length === 0, 'nothing starts the picker in the background: the keepalive is gone');
+    calls.length = 0;
+    const before = picker.status().releasedAt;
+    const bad = await picker.release(async (uri, p) => { calls.push([uri, p]); return { returnValue: false, errorText: 'not running' }; });
+    ok(bad.returnValue === false && calls.length === 1 && picker.status().releasedAt === before,
+      'a failed close is reported, does not throw and does not update the release time');
+  }
+
+  // 9. the picker's window handling: shipped metadata, the page's own activation and the bootstrap rewrite (issue #5)
+  {
+    const info = JSON.parse(fs.readFileSync(path.join(root, 'picker', 'app', 'appinfo.json'), 'utf8'));
+    ok(info.handlesRelaunch === true && info.defaultWindowType === 'overlay' && info.visible === false,
+      'picker appinfo: relaunch is handled by the page; ships as a hidden overlay window');
+    ok(/else\{activate\(\);show\(\)\}/.test(fs.readFileSync(path.join(root, 'picker', 'app', 'index.html'), 'utf8')),
+      'picker page: a relaunch of a hidden picker activates the window itself');
+    const jt = path.join(root, 'scripts', 'jtool.js'), ai = path.join(tmp, 'wintype.json');
+    fs.writeFileSync(ai, JSON.stringify({ id: 'x', defaultWindowType: 'overlay' }));
+    ok(cp.spawnSync(process.execPath, [jt, 'wintype', ai, 'topui']).status === 0 && JSON.parse(fs.readFileSync(ai, 'utf8')).defaultWindowType === 'topui',
+      'jtool wintype rewrites the window type when it differs');
+    ok(cp.spawnSync(process.execPath, [jt, 'wintype', ai, 'topui']).status === 1, 'jtool wintype is quiet when the type already matches');
+    ok(/fix_window_type \$APPS_ROOT\/com\.cleanyourtv\.picker/.test(fs.readFileSync(path.join(root, 'scripts', 'bootstrap.sh'), 'utf8')),
+      'bootstrap rewrites the picker window type the same way as the notification app');
+  }
+
   for (const check of ['security-check.js', 'i18n-check.js']) {
     const result = cp.spawnSync(process.execPath, [path.join(root, 'tools', check)], { encoding: 'utf8' });
     console.log(result.stdout || ''); if (result.stderr) console.error(result.stderr);

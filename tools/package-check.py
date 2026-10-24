@@ -72,6 +72,8 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
                     assert members[service + 'inputhook/libinputhookpp.so'].mode == 0o644
                     package = json.load(archive.extractfile(members['usr/palm/packages/com.cleanyourtv.manager/packageinfo.json']))
                     assert package['app'] == 'com.cleanyourtv.manager' and package['services'] == ['com.cleanyourtv.manager.service']
+                    picker_info = json.load(archive.extractfile(members['usr/palm/applications/com.cleanyourtv.picker/appinfo.json']))
+                    assert picker_info['handlesRelaunch'] is True and picker_info['defaultWindowType'] == 'overlay'
                     assert package['version'] == '9.8.7'
                     assert b"const VERSION = '9.8.7'" in archive.extractfile(members[service + 'helper/helper.js']).read()
                     frontend = json.load(archive.extractfile(members[service + 'payload/app/version.json']))
