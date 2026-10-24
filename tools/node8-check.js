@@ -344,6 +344,26 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
   const gen = require(path.join(root, 'tools', 'theme-docs.js')), docs = fs.readFileSync(path.join(root, 'docs', 'themes.md'), 'utf8');
   ok(docs.indexOf(gen.table()) >= 0, 'docs/themes.md holds the table generated from the schema (run: node tools/theme-docs.js)');
 
+  // 8. the Inputs picker runs on demand only: nothing starts or keeps it in the background (remote freeze, issue #5)
+  {
+    const calls = [];
+    const luna = async (uri, p) => { calls.push([uri, p]); return { returnValue: true }; };
+    const picker = require(path.join(helper, 'picker'));
+    ok(picker.status().mode === 'ondemand' && !picker.status().releasedAt, 'picker status reports the on-demand mode with no release yet');
+    const r = await picker.release(luna);
+    ok(calls.length === 1 && calls[0][0] === 'luna://com.webos.applicationManager/closeByAppId' && calls[0][1].id === 'com.cleanyourtv.picker' && r.returnValue === true,
+      'picker release closes only the picker app');
+    ok(picker.status().releasedAt > 0, 'picker remembers when it was last released');
+    calls.length = 0;
+    await new Promise(done => setTimeout(done, 120));
+    ok(calls.length === 0, 'nothing starts the picker in the background: the keepalive is gone');
+    calls.length = 0;
+    const before = picker.status().releasedAt;
+    const bad = await picker.release(async (uri, p) => { calls.push([uri, p]); return { returnValue: false, errorText: 'not running' }; });
+    ok(bad.returnValue === false && calls.length === 1 && picker.status().releasedAt === before,
+      'a failed close is reported, does not throw and does not update the release time');
+  }
+
   for (const check of ['security-check.js', 'i18n-check.js']) {
     const result = cp.spawnSync(process.execPath, [path.join(root, 'tools', check)], { encoding: 'utf8' });
     console.log(result.stdout || ''); if (result.stderr) console.error(result.stderr);

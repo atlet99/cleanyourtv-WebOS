@@ -72,6 +72,8 @@ let live = null;
 try { live = require('./live'); } catch (e) { console.error('live module failed:', e.message); }
 let inputhook = { ensure() {}, status() { return {}; } };
 try { inputhook = require('./inputhook'); } catch (e) { console.error('inputhook module failed:', e.message); }
+let picker = { release: () => ({ returnValue: false }), status: () => ({ mode: 'ondemand' }) };
+try { picker = require('./picker'); } catch (e) { console.error('picker module failed:', e.message); }
 const options = () => Object.assign({ debloat: true, inputKey: true, liveTv: true }, readConf().options || {});
 const keyCode = () => String(((readConf().keys || {}).input) || '241');
 const voiceKey = () => { const v = readConf().voice || {}; return v.enabled && voice && voice.installed() ? String((readConf().keys || {}).voice || '') : ''; };
@@ -86,7 +88,7 @@ inputhook.setGuideKey && inputhook.setGuideKey(guideKey);
 let notifyApi = null;
 try { if (notify) notifyApi = require('./notifyapi').create({ notify, readConf, writeConf }); } catch (e) { console.error('notification api module failed:', e.message); }
 let manager = null;
-try { manager = require('./manager').create({ luna, readConf, writeConf, inputhook, VERSION, notifyApi, voice, pickerShown: () => pickerShownAt }); } catch (e) { console.error('manager module failed:', e.message); }
+try { manager = require('./manager').create({ luna, readConf, writeConf, inputhook, VERSION, notifyApi, voice, picker, pickerShown: () => pickerShownAt }); } catch (e) { console.error('manager module failed:', e.message); }
 const body = req => new Promise((resolve, reject) => { let b = '', size = 0; req.on('data', c => { size += c.length; if (size > 65536) { req.destroy(); reject(new Error('request too large')); } else b += c; }); req.on('error', reject); req.on('end', () => { try { resolve(JSON.parse(b || '{}')); } catch (_) { reject(new Error('invalid JSON')); } }); });
 
 http.createServer(async (req, res) => {
@@ -111,6 +113,7 @@ http.createServer(async (req, res) => {
     if (live && u.startsWith('/api/live/')) return live.handle(req, res, u, body);
     if (theme && u.startsWith('/api/theme/')) return theme.handle(req, res, u, body);
     if (u === '/api/log') { if (/picker show/.test(decodeURIComponent(req.url.split('m=')[1] || ''))) pickerShownAt = Date.now(); console.log(fs.readFileSync('/proc/uptime', 'utf8').split(' ')[0] + ' ' + decodeURIComponent((req.url.split('m=')[1] || '')).slice(0, 300)); return json({}); }   // small diagnostics from the overlay apps
+    if (u === '/api/picker/release' && req.method === 'POST') return json(await picker.release(luna));   // the picker page is done: close the app, nothing stays hidden
     if (manager && u.startsWith('/api/manager/')) return manager.handle(req, res, u, body);
     if (u === '/api/frontend-ok' && req.method === 'POST') { const b = await body(req); if (manager) manager.frontendLoaded(String(b.version || '')); return json({ returnValue: true }); }
     if (u === '/api/version') return json({ version: VERSION });
@@ -158,6 +161,5 @@ http.createServer(async (req, res) => {
   // Input key: bind it and keep the hook in LG's input processes (they restart now and then)
   setTimeout(() => inputhook.ensure(options().inputKey, keyCode()), 500);
   setInterval(() => inputhook.ensure(options().inputKey, keyCode()), 30000);
-  try { require('./picker').start(luna, () => options().inputKey); } catch (e) { console.error('picker module failed:', e.message); }
   if (manager) setTimeout(() => manager.check(), 60000);
 });

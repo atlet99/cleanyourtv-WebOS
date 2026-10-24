@@ -1,25 +1,18 @@
-// Keeps the Inputs picker overlay app (com.cleanyourtv.picker) running hidden. A cold start takes ~8 s before the app
-// gets the remote; once running, every press only wakes it. Starts it after boot and again if the system closes it.
+// The Inputs picker (com.cleanyourtv.picker) runs on demand only: the Input key launches it (scripts/inputkey.sh) and the
+// page asks the service to close it when it is done. Nothing starts or keeps it in the background: on several firmwares
+// a hidden overlay app keeps the remote and the whole UI freezes (upstream issue #6, fork issue #5) — the old keepalive
+// started it hidden after every boot for exactly that reason, on every webOS version. A cold start costs a few seconds;
+// the page caches its layout in localStorage, so only the icons need the network afterwards.
+const fs = require('fs');
 const PICKER = 'com.cleanyourtv.picker';
-function start(luna, enabled) {
-  let fails = 0;
-  async function tick() {
-    try {
-      if (!enabled()) return true;
-      const pw = await luna('luna://com.webos.service.tvpower/power/getPowerState', {});
-      if (pw.state && !['Active', 'Screen Saver'].includes(pw.state)) return true;   // not while in standby
-      const run = await luna('luna://com.webos.applicationManager/running', {});
-      if (!Array.isArray(run.running)) return false;
-      if (run.running.some(a => a.id === PICKER)) { fails = 0; return true; }
-      if (!(await luna('luna://com.webos.applicationManager/getAppInfo', { id: PICKER })).returnValue) return false;   // not installed (yet)
-      if (fails++ > 5) return true;   // something keeps killing it; stop trying until restart
-      await luna('luna://com.webos.applicationManager/launch', { id: PICKER, params: { prewarm: true } });
-      return false;
-    } catch (e) { console.error('picker keepalive:', e.message); return false; }
-  }
-  // quickly after boot until it is up, then now and then
-  let fast = 0;
-  const loop = async () => { const up = await tick(); if (up) fast = 0; setTimeout(loop, up || fast++ > 40 ? 30000 : 4000); };
-  setTimeout(loop, 2000);
+let releasedAt = 0;
+async function release(luna) {
+  const r = await luna('luna://com.webos.applicationManager/closeByAppId', { id: PICKER });
+  if (r && r.returnValue !== false) {
+    releasedAt = Date.now();
+    try { console.log(fs.readFileSync('/proc/uptime', 'utf8').split(' ')[0] + ' picker released'); } catch (_) { console.log('picker released'); }   // Share log: shows whether an overlay was left up
+  } else console.error('picker release failed:', JSON.stringify(r).slice(0, 120));
+  return r;
 }
-module.exports = { start };
+const status = () => ({ mode: 'ondemand', releasedAt: releasedAt || undefined });
+module.exports = { release, status };

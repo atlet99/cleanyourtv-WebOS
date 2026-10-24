@@ -22,6 +22,12 @@ It uses the bundled [inputhook](credits.md#inputhook) library, which injects a s
 button can run a command. The Input button's code is **241** by default. The command opens the picker app
 (`com.cleanyourtv.picker`) over whatever is on screen.
 
+The picker runs **on demand only**: it is started when you press the key and closed again when you are done, so nothing
+from CleanYourTV stays running in the background. A hidden overlay app keeps the remote on some firmware and freezes the
+whole UI, which is why the old always-running mode is gone. The trade-off is the web app's cold start: the first press
+after a while can take a few seconds. The layout and icons are cached on the TV, so the page is ready as soon as the
+web view is up.
+
 ## Learning your remote's code
 
 Remotes differ. In the manager app, **Input key** > **Learn the Input key** reads the code of the button you press and tests that
