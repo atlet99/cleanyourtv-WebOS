@@ -103,9 +103,19 @@ with tempfile.TemporaryDirectory(prefix='cytv-release-') as directory:
     try:
         os.environ['GITHUB_REPOSITORY'] = 'owner/project'
         release.run, release.gh_json, release.releases = fake_run, fake_json, lambda repo: state['releases']
+        assert not release.publish({'publish': False}, public, root)
         state['main'] = 'b' * 40
         assert not release.publish(data, public, root) and not state['releases']
         state['main'] = data['source']
+        tracked = root / 'helper/helper.js'
+        original_source = tracked.read_text()
+        tracked.write_text('modified after checks')
+        try:
+            release.publish(data, public, root)
+            raise AssertionError('modified tracked sources were accepted')
+        except ValueError as error:
+            assert 'Tracked sources changed' in str(error)
+        tracked.write_text(original_source)
         asset = dist / ('frontend-' + data['version'] + '.tgz')
         original_bytes = asset.read_bytes()
         asset.write_bytes(b'tampered')

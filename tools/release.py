@@ -128,9 +128,13 @@ def remote_tag(repo, tag):
 
 
 def publish(data, public_key, root=ROOT):
+    if data.get('publish') is not True:
+        return False
     repo, tag, sha = data['repo'], data['tag'], data['source']
     if repo != os.environ.get('GITHUB_REPOSITORY') or tag != 'v' + data['version'] or git('rev-parse', 'HEAD', root=root) != sha:
         raise ValueError('Release plan does not match the checked-out repository/commit')
+    if git('status', '--porcelain', '--untracked-files=no', root=root):
+        raise ValueError('Tracked sources changed after checkout; refusing publication')
     version(data['version'])
     main = lambda: gh_json('api', 'repos/' + repo + '/git/ref/heads/main')['object']['sha']
     if main() != sha:
