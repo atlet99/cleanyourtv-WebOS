@@ -6,9 +6,9 @@ This repository is an independently maintained fork of
 [lasharor/cleanyourtv-WebOS](https://github.com/lasharor/cleanyourtv-WebOS). Credit for the original webOS implementation
 and inherited documentation belongs to lasharor and the upstream contributors.
 
-[atlet99/cleanyourtv-WebOS](https://github.com/atlet99/cleanyourtv-WebOS) maintains this fork, including its Russian
-localisation, security hardening and documentation-site configuration. Releases from this repository are maintained
-separately from the original project. The original MIT licence and copyright notices are retained.
+[atlet99/cleanyourtv-WebOS](https://github.com/atlet99/cleanyourtv-WebOS), maintained by Abdurakhman Rakhmankulov (atlet99),
+carries this fork, including its Russian localisation, security hardening and documentation-site configuration. Releases from
+this repository are maintained separately from the original project. The original MIT licence and copyright notices are retained.
 
 ## Licence and bundled components
 

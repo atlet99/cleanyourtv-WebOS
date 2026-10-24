@@ -56,7 +56,8 @@ the [Input key](input-key.md).
 
 ## How it plays
 
-- The TV's own player plays **HLS** (`.m3u8`).
+- The TV's own player plays **HLS** (`.m3u8`). Xtream-style `/live/….ts` links start with the plain MPEG-TS variant first
+  (about a second on webOS 5/6, where the typed-HLS tries only stall until the timeout); the HLS variants stay as fallbacks.
 - Stepping through channels with Up/Down starts the new channel only when the keys have paused for 180 ms. Channels you skip
   are never requested from your provider, which matters for accounts that allow one connection.
 - The player uses one video element for the whole session instead of creating one per channel.

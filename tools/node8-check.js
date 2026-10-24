@@ -2,7 +2,7 @@
 //   node tools/node8-check.js
 // It parses every service file, loads the modules and runs the parts that used APIs Node 8 lacks (pairing code, URL and
 // form handling, outgoing http requests, mkdir -p) against a local server. Nothing leaves this machine.
-const fs = require('fs'), os = require('os'), path = require('path'), http = require('http'), cp = require('child_process');
+const fs = require('fs'), os = require('os'), path = require('path'), http = require('http'), cp = require('child_process'), vm = require('vm');
 const root = path.join(__dirname, '..'), helper = path.join(root, 'helper');
 let failed = 0;
 const ok = (c, name) => { console.log((c ? 'ok   ' : 'FAIL ') + name); if (!c) failed++; };
@@ -98,6 +98,21 @@ const fake = (url, method) => { const res = { code: 0, out: '', writeHead(c) { t
   f = fake('/api/live/probe?key=zzzzzzzzzz&i=0'); await live.handle(f.req, f.res, '/api/live/probe', async () => ({})); ok(f.res.code === 404, 'probe: only streams of the playlist are asked about');
   ps.close();
   f = fake('/api/live/reset', 'POST'); await live.handle(f.req, f.res, '/api/live/reset', async () => ({}));
+
+  // 4c. player variant order, extracted from the launcher page so the inline script cannot drift
+  const vfSrc = /\n  function variantsFor\(url\)\{[\s\S]*?\n  \}/.exec(fs.readFileSync(path.join(root, 'app', 'index.html'), 'utf8'));
+  ok(!!vfSrc, 'launcher page contains variantsFor');
+  const vf = vm.runInNewContext('(function(){' + vfSrc[0] + ';return variantsFor})()');
+  const liveTs = vf('http://h/live/u/p/12.ts');
+  ok(liveTs.length === 3 && liveTs[0].src === 'http://h/live/u/p/12.ts' && !liveTs[0].type
+    && liveTs[1].src === 'http://h/live/u/p/12.ts' && liveTs[1].type === 'application/x-mpegURL'
+    && liveTs[2].src === 'http://h/live/u/p/12.m3u8' && liveTs[2].type === 'application/x-mpegURL',
+    'variants: a /live/…/*.ts link starts with the plain variant; typed HLS and the provider .m3u8 follow');
+  ok(vf('http://h/a.m3u8').length === 1 && !vf('http://h/a.m3u8')[0].type
+    && vf('http://h/a.m3u8?x=1').length === 1, 'variants: a plain .m3u8 link keeps a single untyped variant');
+  const other = vf('http://h/v.ts');
+  ok(other.length === 2 && other[0].type === 'application/x-mpegURL' && other[0].src === 'http://h/v.ts' && !other[1].type,
+    'variants: other URLs keep the typed-HLS-first order');
 
   // 5. version comparison used by the updater
   const { cmp } = require(path.join(helper, 'manager')); ok(cmp('1.5.10', '1.5.9') > 0 && cmp('1.5.3', '1.5.3') === 0 && cmp('1.4.9', '1.5.0') < 0, 'version compare');
