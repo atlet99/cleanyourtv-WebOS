@@ -183,6 +183,7 @@
     'launcher {0} is not in the latest release':'Главного экрана версии {0} нет в выбранном выпуске', 'service {0} is not in the latest release':'Службы версии {0} нет в выбранном выпуске',
     'the download is not launcher {0}':'Загруженный пакет не соответствует главному экрану версии {0}', 'the system refused the install: {0}':'Система отказала в установке: {0}',
     'your server answered {0}':'Ваш сервер вернул HTTP {0}', 'Home Assistant answered {0}':'Home Assistant вернул HTTP {0}',
+    'server answered {0}':'Сервер вернул HTTP {0}',
     'the routing must be one of ha-first, ha-only, ai-only':'Режим должен быть ha-first, ha-only или ai-only',
     'the address is not valid':'Некорректный адрес', 'the address must start with http:// or https://':'Адрес должен начинаться с http:// или https://',
     'no destination: set up Home Assistant, switch on the AI chat or set a server address':'Получатель не задан. Настройте Home Assistant, включите ответы ИИ или укажите свой сервер',

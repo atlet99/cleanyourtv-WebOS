@@ -151,15 +151,42 @@ function xmltvTime(s) {
   if (m[7]) { const sign = m[7][0] === '-' ? -1 : 1; t -= sign * (+m[7].slice(1, 3) * 60 + +m[7].slice(3, 5)) * 60000; }
   return Math.floor(t / 1000);
 }
-async function loadEpg(url, wantedIds) {
-  const stream = await get(url), want = new Set(wantedIds), byId = {};
+// Guide matching: a guide's channel id rarely equals tvg-id verbatim — punctuation differs ('TVP.1' vs 'TVP 1') and
+// some guides simply use the display name as the id. Order: exact id, then punctuation-insensitive id/name.
+const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+// Xtream playlists are get.php?username=…&password=…; the provider's guide is the same host's xmltv.php with the same credentials.
+const xtreamEpg = playlistUrl => {
+  let u; try { u = new URL(playlistUrl); } catch (_) { return ''; }
+  if (!/\/get\.php$/i.test(u.pathname)) return '';
+  const user = u.searchParams.get('username'), pass = u.searchParams.get('password');
+  if (!user || !pass) return '';
+  return u.protocol + '//' + u.host + '/xmltv.php?username=' + encodeURIComponent(user) + '&password=' + encodeURIComponent(pass);
+};
+async function loadEpg(url, channels) {
+  let stream = await get(url);
+  if (/\.gz($|\?)/i.test(url)) { const gz = zlib.createGunzip(); stream.on('error', e => gz.destroy(e)); stream.pipe(gz); stream = gz; }   // some servers send .xml.gz without a gzip content-encoding header
+  const want = new Set(), byNorm = {};
+  for (const c of channels) {
+    if (!c.id) continue;
+    want.add(c.id);
+    const n = norm(c.name), i = norm(c.id);
+    if (n && byNorm[n] === undefined) byNorm[n] = c.id;
+    if (i && byNorm[i] === undefined) byNorm[i] = c.id;
+  }
+  const idOf = g => (want.has(g) ? g : byNorm[norm(g)] || '');
   const now = Math.floor(Date.now() / 1000), from = now - 3600, to = now + 36 * 3600;
-  let buf = '', cur = null, count = 0;
+  let buf = '', cur = null, count = 0, byId = {};
   const handle = line => {
     let m;
-    if ((m = line.match(/<programme\b[^>]*\bchannel="([^"]*)"[^>]*\bstart="([^"]*)"[^>]*\bstop="([^"]*)"/))) cur = want.has(m[1]) ? { id: m[1], s: xmltvTime(m[2]), e: xmltvTime(m[3]), t: '', d: '' } : null;
-    else if (cur && !cur.t && (m = line.match(/<title[^>]*>([^<]*)<\/title>/))) cur.t = decode(m[1]);
-    else if (cur && !cur.d && (m = line.match(/<desc[^>]*>([^<]*)<\/desc>/))) cur.d = decode(m[1]).slice(0, 220);
+    if (line.indexOf('<programme') >= 0 && line.match(/<programme\b/)) {   // attributes in any order: most guides write start/stop before channel
+      const a = {};
+      line.replace(/([\w-]+)="([^"]*)"/g, (_, k, v) => { a[k.toLowerCase()] = v; return ''; });
+      const id = a.channel ? idOf(decode(a.channel)) : '';
+      cur = id ? { id, s: xmltvTime(a.start || ''), e: xmltvTime(a.stop || ''), t: '', d: '' } : null;
+    }
+    // not an else: some guides keep <programme …><title>…</title></programme> on one line
+    if (cur && !cur.t && (m = line.match(/<title[^>]*>([^<]*)<\/title>/))) cur.t = decode(m[1]);
+    if (cur && !cur.d && (m = line.match(/<desc[^>]*>([^<]*)<\/desc>/))) cur.d = decode(m[1]).slice(0, 220);
     if (cur && line.includes('</programme>')) {
       if (cur.e > from && cur.s < to && !/^no data$/i.test(cur.t.trim())) { (byId[cur.id] = byId[cur.id] || []).push(cur.d ? [cur.s, cur.e, cur.t, cur.d] : [cur.s, cur.e, cur.t]); count++; }
       cur = null;
@@ -189,10 +216,10 @@ async function refresh(force) {
       writeJson(PLAYLIST, playlist);
     }
     status = { state: 'idle', error: '' };
-    const epgUrl = settings.epgUrl || playlist.epgUrl;
+    const epgUrl = settings.epgUrl || playlist.epgUrl || xtreamEpg(settings.playlistUrl);
     if (epgUrl && (force || !epg || epg.v !== 3 || Date.now() - epg.fetchedAt > REFRESH_MS)) {
       status = { state: 'loading guide', error: '' };
-      try { epg = await loadEpg(epgUrl, playlist.channels.map(c => c.id).filter(Boolean)); writeJson(EPG, epg); }
+      try { epg = await loadEpg(epgUrl, playlist.channels); writeJson(EPG, epg); }
       catch (e) { status = { state: 'idle', error: 'guide: ' + e.message }; }
     }
     if (status.state !== 'idle') status = { state: 'idle', error: status.error };
@@ -291,4 +318,4 @@ async function handle(req, res, u, body) {
 if (settings.playlistUrl) setTimeout(() => refresh(false), 20000);
 setInterval(() => refresh(false), 6 * 3600 * 1000).unref();
 
-module.exports = { handle, parseM3U, probe };
+module.exports = { handle, parseM3U, probe, loadEpg, xtreamEpg };
