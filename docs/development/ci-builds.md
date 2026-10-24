@@ -39,7 +39,8 @@ No npm publishing, Nix job, PAT or bot version commit is required. The normal `G
 
 For a releasable change, the job installs the locked **`@atlet99/webos-packager-plugin/core` 2.2.0** in a private temporary directory,
 builds the production files with the planned version, signs and verifies their SHA-256 files, and creates a draft release at the checked commit.
-Only after all six assets are uploaded and verified is the release published as latest, with its `vX.Y.Z` tag.
+Only after all six assets are uploaded and their state/size/SHA-256 digests are verified is the release published with its `vX.Y.Z` tag.
+GitHub's semantic-version-aware latest selection prevents a concurrently published higher version being replaced as latest by an older one.
 It does not depend on a second workflow being triggered by a bot-created tag.
 
 Release runs are serialised. If `main` advances during the build/upload, publication is skipped and a later checked run aggregates
@@ -67,17 +68,18 @@ A stable release has one version for the package, runtime service and frontend.
 `CYTV_RELEASE_VERSION=X.Y.Z` sets that version during asset preparation, including the embedded service constant,
 frontend version JSON, launcher constant and minimum required service. No version changes are committed back to `main`.
 Checking out an exact stable `vX.Y.Z` tag also selects that version automatically.
+If a commit has multiple stable tag aliases, the highest is selected unless `CYTV_RELEASE_VERSION` is supplied explicitly.
 An untagged development build keeps the existing service/frontend versions in the source files.
 `BUILD` records the exact checked source commit; updating the version does not change the source commit being released.
 
-## Manual packages and test channels
+## Manual packages and branch previews
 
 **Build IPK** (`build-ipk.yml`) remains a manual workflow for local-style packages or another prepared app.
 Download its `webos-ipk-…` artifact from the run; it is retained for 30 days and requires a GitHub login.
 It does not publish a stable release. Without signing keys it can build unsigned development packages.
 
-**Test build** (`test-build.yml`) is also manual-only. A maintainer can choose a branch and explicitly publish its signed `test-<branch>`
-prerelease for the TV's Update channel. Ordinary branch pushes and pull requests no longer publish prereleases.
+The former automatic branch publisher (`test-build.yml`) is removed. Branch pull requests produce preview artifacts only;
+the TV's optional test-channel feature still recognises explicitly published signed `test-*` prereleases, but ordinary CI never creates them.
 
 ## Reusable generic packaging Action
 

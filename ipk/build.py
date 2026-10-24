@@ -47,8 +47,7 @@ def frontend_asset(rel, body):
         body = page(body)
     return body
 
-# A test build (made by .github/workflows/test-build.yml from a branch) carries the commit it was made from in a BUILD file, in the
-# package and in the launcher, so the manager can tell two builds with the same version number apart.
+# CI builds carry their source commit in BUILD, in the package and launcher, so equal development versions remain distinguishable.
 BUILD = os.environ.get('CYTV_BUILD', '').strip()
 if BUILD and not re.fullmatch(r'[0-9a-f]{7,40}', BUILD):
     sys.exit('CYTV_BUILD must be a commit hash')

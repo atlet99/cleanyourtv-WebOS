@@ -40,12 +40,12 @@ go to a TV. The mock needs to answer `/api/apps`, `/api/live/*` and `/api/manage
 |---|---|---|
 | `ci.yml` / `checks.yml` | Pull requests to `main`, or called from Release | ESLint, Ruff, actionlint/ShellCheck, release tests, Node 8 suite, packaging tests and strict docs build; unsigned preview artifacts only |
 | `release.yml` | Push to `main`, or manual run on `main` | Requires checks, selects a semantic version, signs and verifies packages, uploads a draft and publishes it with its tag |
-| `test-build.yml` | Explicit manual run | Builds and publishes a signed pre-release `test-<branch>` for TV testing |
 | `build-ipk.yml` | Manual run | Builds downloadable artifacts; can package another prepared app with the isolated plugin |
 | `localization.yml` | Relevant pushes and pull requests, or manual run | Checks localisation dictionaries and rendering on Node 8.12.0 without release secrets |
 | `docs.yml` | Pushes that touch the documentation | Builds this site; deploys it to GitHub Pages from `main` |
 
-A test build appears in the manager app's **Update channel** list; see [Test builds](../managing.md#test-builds).
+Explicitly published signed test prereleases can appear in the manager app's **Update channel** list; CI previews are artifacts only.
+See [Test builds](../managing.md#test-builds).
 For automatic package builds, signing settings and the reusable packaging action, see [IPK builds in GitHub Actions](ci-builds.md).
 Both main and test-branch IPK builds use the locked standalone packager **2.2.0**, installed only in the runner's temporary directory.
 `NODE_PATH=/path/to/isolated/node_modules python3 tools/package-check.py` checks signatures, multi-app metadata, modes, timestamps and byte reproducibility.

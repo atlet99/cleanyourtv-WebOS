@@ -168,14 +168,15 @@ def publish(data, public_key, root=ROOT):
         for asset in assets:
             remote = next(a for a in uploaded['assets'] if a['name'] == asset.name)
             digest = 'sha256:' + hashlib.sha256(asset.read_bytes()).hexdigest()
-            if remote['size'] != asset.stat().st_size or (remote.get('digest') and remote['digest'] != digest):
+            if remote.get('state') != 'uploaded' or remote['size'] != asset.stat().st_size or remote.get('digest') != digest:
                 raise ValueError('Uploaded release asset differs: ' + asset.name)
         if main() != sha:
             print('Main advanced during upload; keeping the release as a draft')
             return False
         if remote_tag(repo, tag) not in (None, sha):
             raise ValueError('Release tag changed during upload')
-        run('gh', 'release', 'edit', tag, '--repo', repo, '--draft=false', '--latest', '--target', sha)
+        run('gh', 'api', '--method', 'PATCH', 'repos/' + repo + '/releases/' + str(uploaded['id']),
+            '-F', 'draft=false', '-f', 'make_latest=legacy', '-f', 'target_commitish=' + sha)
         if remote_tag(repo, tag) != sha:
             raise ValueError('Published tag does not match the build commit')
         return True

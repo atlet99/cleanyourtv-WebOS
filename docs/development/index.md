@@ -35,7 +35,7 @@ See [Checks and releases](ci-builds.md) for version rules, signing and the reusa
 NODE_PATH=/path/to/isolated/node_modules python3 ipk/build.py
 ```
 
-writes the release files to `dist/`; [optional local tooling setup](ci-builds.md#optional-local-tooling) installs the pinned
+writes the release files to `dist/`; [optional local tooling setup](ci-builds.md#optional-local-checks) installs the pinned
 `@atlet99/webos-packager-plugin/core` dependency without webpack. The output is `com.cleanyourtv.manager_<version>_all.ipk`, `frontend-<version>.tgz` and a `.sha256` file for
 each. On an exact stable tag, its version is used automatically for both service and frontend; CI passes the same value through
 `CYTV_RELEASE_VERSION`. Untagged development builds use `VERSION` in `helper/helper.js` and the matching frontend values in

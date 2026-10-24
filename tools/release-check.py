@@ -84,16 +84,18 @@ with tempfile.TemporaryDirectory(prefix='cytv-release-') as directory:
     def fake_run(*args, **kwargs):
         if args[0] != 'gh':
             return original_run(*args, **kwargs)
-        operation = args[2]
-        if operation == 'create':
-            state['releases'].append({'tag_name': data['tag'], 'draft': True, 'body': data['notes'], 'assets': []})
-        elif operation == 'upload':
-            state['releases'][0]['assets'] = [{'name': p.name, 'size': p.stat().st_size,
-                                              'digest': 'sha256:' + ('0' * 64 if state['corrupt'] else hashlib.sha256(p.read_bytes()).hexdigest())} for p in dist.iterdir() if p.name != 'release-notes.tmp']
-        elif operation == 'edit':
+        if args[1] == 'api':
+            assert 'PATCH' in args and 'make_latest=legacy' in args and 'draft=false' in args
             state['published'] += 1
             state['releases'][0]['draft'] = False
             state['tag'] = data['source']
+            return ''
+        operation = args[2]
+        if operation == 'create':
+            state['releases'].append({'id': 1, 'tag_name': data['tag'], 'draft': True, 'body': data['notes'], 'assets': []})
+        elif operation == 'upload':
+            state['releases'][0]['assets'] = [{'name': p.name, 'state': 'uploaded', 'size': p.stat().st_size,
+                                              'digest': 'sha256:' + ('0' * 64 if state['corrupt'] else hashlib.sha256(p.read_bytes()).hexdigest())} for p in dist.iterdir() if p.name != 'release-notes.tmp']
         else:
             raise AssertionError('Unexpected GitHub write: ' + str(args))
         return ''
@@ -104,6 +106,16 @@ with tempfile.TemporaryDirectory(prefix='cytv-release-') as directory:
         state['main'] = 'b' * 40
         assert not release.publish(data, public, root) and not state['releases']
         state['main'] = data['source']
+        asset = dist / ('frontend-' + data['version'] + '.tgz')
+        original_bytes = asset.read_bytes()
+        asset.write_bytes(b'tampered')
+        try:
+            release.publish(data, public, root)
+            raise AssertionError('tampered local asset was accepted')
+        except ValueError as error:
+            assert 'checksum' in str(error)
+        assert not state['releases']
+        asset.write_bytes(original_bytes)
         try:
             release.publish(data, public, root)
             raise AssertionError('corrupted remote assets were accepted')

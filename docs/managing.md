@@ -22,9 +22,9 @@ For the first signed version, update the service package first; see [Migration](
 
 ### Test builds
 
-When a change needs to be tried on a TV the maintainer does not have, it is put on a branch. A maintainer can explicitly run
-**Actions → Test build** for that branch to publish a signed **pre-release** named `test-<branch>`.
-Ordinary branch pushes and pull requests only run checks/builds and do not publish prereleases automatically.
+When a change needs to be tried on a TV the maintainer does not have, it can be offered as an explicitly published signed
+**pre-release** named `test-<branch>`. Ordinary branch pull requests only run checks/builds and produce preview artifacts;
+the former automatic branch-release workflow has been removed.
 The stable updater never sees pre-releases.
 
 | | |
