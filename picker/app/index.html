@@ -144,10 +144,14 @@ document.addEventListener('keydown',function(e){
   e.preventDefault()});
 document.addEventListener('click',function(e){if(!shown)return;var r=e.target.closest&&e.target.closest('[data-r]');if(r){row=+r.getAttribute('data-r');col[row]=+r.getAttribute('data-i');paint();choose()}else hide()});
 document.addEventListener('mousemove',function(e){var r=e.target.closest&&e.target.closest('[data-r]');if(!r)return;var a=+r.getAttribute('data-r'),i=+r.getAttribute('data-i');if(a!==row||i!==col[row]){moved=true;row=a;col[row]=i;paint()}});
+/* handlesRelaunch is on in appinfo.json: the platform does NOT show the window by itself on a relaunch, the page decides.
+   Bringing it to the foreground is our job (PalmSystem.activate), otherwise a hidden app would take the key and freeze
+   the UI on some firmware. */
+function activate(){try{if(window.PalmSystem&&PalmSystem.activate)PalmSystem.activate();else if(window.webOSSystem&&webOSSystem.activate)webOSSystem.activate()}catch(e){}}
 document.addEventListener('webOSRelaunch',function(){
   log('relaunch shown='+shown);
   if(shown){if(Date.now()-shownAt>700)hide()}   // Input pressed again closes it
-  else show()});
+  else{activate();show()}});
 load();
 show();
 </script></body></html>

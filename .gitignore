@@ -5,6 +5,7 @@ site/
 *private*.pem
 *.key
 /.release_keys/
+/test_results/
 # Repository checks must remain visible even with a global tools/ ignore.
 !tools/
 __pycache__/

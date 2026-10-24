@@ -28,6 +28,10 @@ whole UI, which is why the old always-running mode is gone. The trade-off is the
 after a while can take a few seconds. The layout and icons are cached on the TV, so the page is ready as soon as the
 web view is up.
 
+The overlay window itself follows the firmware: `overlay` below webOS 25 and `topui` from webOS 25 on (the setup rewrites
+this once, the screen blinks when it changes). The app reports relaunches (`handlesRelaunch`), so opening it is the
+page's decision — a press shows it, a second press closes it, and nothing is displayed without the page asking for it.
+
 ## Learning your remote's code
 
 Remotes differ. In the manager app, **Input key** > **Learn the Input key** reads the code of the button you press and tests that
