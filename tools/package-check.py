@@ -84,6 +84,9 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
                 else:
                     frontend = json.load(archive.extractfile(members['app/version.json']))
                     assert frontend['version'] == frontend['minService'] == '9.8.7'
+                    launcher = archive.extractfile(members['app/index.html']).read()
+                    assert b"v.addEventListener('error',onError,true)" in launcher
+                    assert b".test(url))return [{src:url,type:''},{src:url,type:'application/x-mpegURL'}" in launcher
         checksums = {a.name: hashlib.sha256(a.read_bytes()).digest() for a in assets}
         run('python3', 'ipk/build.py', env=env)
         assert all(hashlib.sha256((ROOT / 'dist' / name).read_bytes()).digest() == value for name, value in checksums.items())

@@ -114,6 +114,67 @@ const fake = (url, method) => { const res = { code: 0, out: '', writeHead(c) { t
   ok(other.length === 2 && other[0].type === 'application/x-mpegURL' && other[0].src === 'http://h/v.ts' && !other[1].type,
     'variants: other URLs keep the typed-HLS-first order');
 
+  // 4d. the real fallback flow: the launcher's LIVE module on a fake DOM, <video> errors driven by hand
+  const pageSrc = fs.readFileSync(path.join(root, 'app', 'index.html'), 'utf8');
+  ok(pageSrc.indexOf("v.addEventListener('error',onError,true)") >= 0, 'player listens for error in the capture phase, so a failing <source> moves on at once');
+  const liveSrc = /var LIVE=\(function\(\)\{[\s\S]*?return o\}\)\(\);/.exec(pageSrc)[0];
+  function playerHarness() {
+    const log = [], calls = [], els = {};
+    let video = null;
+    const sandbox = {
+      t: s => s, LANG: 'en', window: {}, localStorage: { getItem: () => null, setItem() {} },
+      $: id => els[id] || (els[id] = { classList: { add() {}, remove() {}, toggle() {} }, style: {}, textContent: '', innerHTML: '', value: '', appendChild() {}, focus() {}, blur() {}, addEventListener() {}, src: '' }),
+      setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {},
+      document: {
+        documentElement: {},
+        getElementById: id => sandbox.$(id),
+        createElement: tag => {
+          if (tag !== 'video') return { src: '', type: '' };
+          const v = { children: [], handlers: {} };
+          Object.defineProperty(v, 'src', { set(x) { v._src = x; log.push('src ' + x); }, get() { return v._src || ''; } });
+          Object.defineProperty(v, 'firstChild', { get() { return v.children[0] || null; } });
+          v.appendChild = c => v.children.push(c);
+          v.removeChild = () => v.children.pop();
+          v.removeAttribute = () => { v._src = ''; };
+          v.load = () => { const c = v.children[v.children.length - 1]; log.push(c ? 'typed ' + c.type + ' ' + c.src : 'src ' + v._src); };
+          v.pause = () => {};
+          v.addEventListener = (type, fn) => { v.handlers[type] = fn; };
+          video = v; return v;
+        }
+      },
+      api: (url, body) => {
+        calls.push(url.split('?')[0] + (body !== undefined ? ' POST' : ''));
+        return Promise.resolve(
+          url.indexOf('/api/live/status') >= 0 ? { configured: true } :
+          url.indexOf('/api/live/channels') >= 0 ? { groups: ['News'], channels: [[1, 'c1', 'Chan', 'News', '', 'http://h/live/u/p/1.ts', 'k1', '', '', '', 0, ['News'], [['http://h/alt/u/2.ts', '']]]] } :
+          url.indexOf('/api/live/probe') >= 0 ? { reason: 'gone' } : {});
+      }
+    };
+    return { log, calls, els, get video() { return video; }, run: () => vm.runInNewContext(liveSrc + ';LIVE', sandbox) };
+  }
+  const tick = () => new Promise(r => setTimeout(r, 20));
+  { // a stream that starts: only the plain variant is requested, no typed fallback is touched
+    const h = playerHarness(), L = h.run(); await tick(); L.enter(false); await tick();
+    ok(h.log.join('|') === 'src http://h/live/u/p/1.ts', 'player: a /live/…/*.ts channel starts on the plain variant');
+    h.video.handlers.playing();
+    ok(h.log.length === 1, 'player: starting playback does not touch the fallback variants');
+    L.exit();
+  }
+  { // every variant fails: plain → typed HLS → provider .m3u8 per stream, then give up. The second stream has no /live/
+    // segment, so it deliberately exercises the other branch order (typed first).
+    const h = playerHarness(), L = h.run(); await tick(); L.enter(false); await tick();
+    const want = ['src http://h/live/u/p/1.ts', 'typed application/x-mpegURL http://h/live/u/p/1.ts', 'typed application/x-mpegURL http://h/live/u/p/1.m3u8',
+      'typed application/x-mpegURL http://h/alt/u/2.ts', 'src http://h/alt/u/2.ts'];
+    let guard = 0;
+    while (h.log.length < want.length && guard++ < 20) { const n = h.log.length; h.video.handlers.error(); if (h.log.length === n) break; }
+    h.video.handlers.error();   // one past the last variant: giveUp marks the channel failed and probes why
+    await tick();
+    ok(h.log.join('\n') === want.join('\n'), 'player: errors walk the variant list of each stream, then give up (' + h.log.length + '/5)');
+    ok(h.calls.indexOf('/api/live/probe') >= 0 && h.els['lv-msg'].innerHTML.indexOf('was not found') >= 0,
+      'player: after the last variant the channel is marked failed with the probe reason');
+    L.exit();
+  }
+
   // 5. version comparison used by the updater
   const { cmp } = require(path.join(helper, 'manager')); ok(cmp('1.5.10', '1.5.9') > 0 && cmp('1.5.3', '1.5.3') === 0 && cmp('1.4.9', '1.5.0') < 0, 'version compare');
 
