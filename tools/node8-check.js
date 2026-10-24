@@ -40,6 +40,7 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
     if (q.url === '/pl.m3u') return r.end('#EXTM3U\n#EXTINF:-1 group-title="G",Chan A\nhttp://127.0.0.1:1/live/u/p/1.m3u8\n');
     if (q.url === '/guide.xml') return r.end(guideXml);
     if (q.url === '/guide.xml.gz') return r.end(zlib.gzipSync(Buffer.from(guideXml)));
+    if (q.url === '/guide-hdr.xml.gz') { r.writeHead(200, { 'content-encoding': 'gzip' }); return r.end(zlib.gzipSync(Buffer.from(guideXml))); }
     r.end(q.method); }).listen(0, '127.0.0.1');
   await new Promise(r => srv.on('listening', r));
   const port = srv.address().port;
@@ -118,6 +119,8 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
     'guide: start/stop before channel, exact ids, display-name ids and punctuation-only differences all match');
   const e2 = await live.loadEpg('http://127.0.0.1:' + port + '/guide.xml.gz', chans);
   ok(e2.count === 3, 'guide: a .xml.gz source without a gzip content-encoding header loads');
+  const e3 = await live.loadEpg('http://127.0.0.1:' + port + '/guide-hdr.xml.gz', chans);
+  ok(e3.count === 3, 'guide: a .xml.gz sent with a proper content-encoding header is not decoded twice');
   ok(live.xtreamEpg('http://h:8080/get.php?username=u%20x&password=p&type=m3u_plus') === 'http://h:8080/xmltv.php?username=u%20x&password=p',
     'guide: the Xtream guide address is derived from a get.php playlist address');
   ok(live.xtreamEpg('http://h/playlist.m3u') === '' && live.xtreamEpg('http://h/get.php?type=m3u_plus') === '' && live.xtreamEpg('::bad') === '',

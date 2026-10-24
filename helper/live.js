@@ -1,6 +1,6 @@
 // Live TV backend for the launcher: reads an M3U playlist (and its XMLTV guide), serves them to the Live TV app,
 // and runs a short-lived pairing page on the LAN so the playlist address can be entered from a phone or computer.
-const http = require('http'), https = require('https'), fs = require('fs'), os = require('os'), zlib = require('zlib'), crypto = require('crypto');
+const http = require('http'), https = require('https'), fs = require('fs'), os = require('os'), zlib = require('zlib'), crypto = require('crypto'), { PassThrough } = require('stream');
 const nc = require('./netcompat'), { URL, URLSearchParams } = nc;
 const DIR = process.env.CYTV_LIVE_DIR || '/media/developer/cleanyourtv/live';
 const SETTINGS = DIR + '/settings.json', PLAYLIST = DIR + '/playlist.json', EPG = DIR + '/epg.json', STATE = DIR + '/state.json';
@@ -162,9 +162,23 @@ const xtreamEpg = playlistUrl => {
   if (!user || !pass) return '';
   return u.protocol + '//' + u.host + '/xmltv.php?username=' + encodeURIComponent(user) + '&password=' + encodeURIComponent(pass);
 };
+// The answer may be gzipped with or without a content-encoding header (.xml.gz files in particular), and get() already
+// unwraps the header case: sniff the magic bytes instead of trusting either, so a correct header is never decoded twice.
+const sniffGzip = s => new Promise((resolve, reject) => {
+  s.once('readable', () => {
+    const first = s.read() || Buffer.alloc(0);
+    const pt = new PassThrough(); pt.write(first);
+    s.on('error', e => pt.destroy(e));
+    if (first.length > 1 && first[0] === 0x1f && first[1] === 0x8b) {
+      const gz = zlib.createGunzip(); pt.pipe(gz);
+      resolve(gz);
+    } else resolve(pt);
+    s.pipe(pt);
+  });
+  s.on('error', reject);
+});
 async function loadEpg(url, channels) {
-  let stream = await get(url);
-  if (/\.gz($|\?)/i.test(url)) { const gz = zlib.createGunzip(); stream.on('error', e => gz.destroy(e)); stream.pipe(gz); stream = gz; }   // some servers send .xml.gz without a gzip content-encoding header
+  const stream = await sniffGzip(await get(url));
   const want = new Set(), byNorm = {};
   for (const c of channels) {
     if (!c.id) continue;
@@ -202,7 +216,7 @@ async function loadEpg(url, channels) {
     stream.on('end', resolve); stream.on('error', reject);
   });
   for (const id in byId) byId[id].sort((a, b) => a[0] - b[0]);
-  return { v: 3, fetchedAt: Date.now(), count, byId };
+  return { v: 4, fetchedAt: Date.now(), count, byId };
 }
 
 let refreshing = false;
@@ -217,7 +231,7 @@ async function refresh(force) {
     }
     status = { state: 'idle', error: '' };
     const epgUrl = settings.epgUrl || playlist.epgUrl || xtreamEpg(settings.playlistUrl);
-    if (epgUrl && (force || !epg || epg.v !== 3 || Date.now() - epg.fetchedAt > REFRESH_MS)) {
+    if (epgUrl && (force || !epg || epg.v !== 4 || Date.now() - epg.fetchedAt > REFRESH_MS)) {
       status = { state: 'loading guide', error: '' };
       try { epg = await loadEpg(epgUrl, playlist.channels); writeJson(EPG, epg); }
       catch (e) { status = { state: 'idle', error: 'guide: ' + e.message }; }
@@ -226,7 +240,6 @@ async function refresh(force) {
   } catch (e) { status = { state: 'idle', error: e.message }; }
   refreshing = false;
 }
-
 // ---- pairing page (LAN, short-lived, needs the code shown on the TV) ----
 let pair = null;
 function lanIp() {
