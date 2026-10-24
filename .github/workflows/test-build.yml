@@ -15,10 +15,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install isolated standalone packager
+        id: packager
+        run: bash .github/actions/package-webos/setup.sh
       - name: Service checks under Node 8.12.0 (what webOS 5 ships)
         run: sh tools/node8-check.sh
+      - name: Check standalone packaging and legacy command
+        env:
+          NODE_PATH: ${{ steps.packager.outputs.directory }}/node_modules
+        run: python3 .github/actions/package-webos/check.py
       - name: Build the package
         env:
+          NODE_PATH: ${{ steps.packager.outputs.directory }}/node_modules
           CYTV_RELEASE_PRIVATE_KEY: ${{ secrets.CYTV_RELEASE_PRIVATE_KEY }}
           CYTV_RELEASE_PUBLIC_KEY_PEM: ${{ vars.CYTV_RELEASE_PUBLIC_KEY_PEM }}
         run: |
@@ -42,3 +56,8 @@ jobs:
             "${GITHUB_SHA::7}" "$GITHUB_REF_NAME" "$GITHUB_REF_NAME" "$svc" "$subject" > notes.txt
           gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$tag" --prerelease --target "$GITHUB_SHA" --title "Test build: $GITHUB_REF_NAME" --notes-file notes.txt dist/*
+      - name: Remove isolated packager
+        if: always() && steps.packager.outputs.directory != ''
+        env:
+          TOOLING_DIRECTORY: ${{ steps.packager.outputs.directory }}
+        run: rm -rf -- "$TOOLING_DIRECTORY"

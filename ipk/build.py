@@ -2,8 +2,9 @@
 """Build the release files into dist/:
   com.cleanyourtv.manager_<version>_all.ipk (+ .sha256)   the package: manager app, picker app, notify app, service
   frontend-<version>.tgz (+ .sha256)                      the launcher alone, installed by the manager app
+Uses @atlet99/webos-packager-plugin/core 2.2.0 via Node.js (NODE_PATH points at the isolated tooling installation).
 Run from anywhere: python3 ipk/build.py"""
-import hashlib, io, json, os, re, shutil, subprocess, sys, tarfile
+import base64, gzip, hashlib, io, json, os, re, shutil, subprocess, sys, tarfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, 'dist')
@@ -47,19 +48,23 @@ def add_dir(files, arc_root, src, mode_for=None, skip=()):
             body = open(p, 'rb').read()
             add(files, arc_root + '/' + rel, page(body) if n == 'index.html' else body, mode)
 
-def tgz(files, prefix=''):
+def tgz(files):
     b = io.BytesIO()
-    with tarfile.open(fileobj=b, mode='w:gz', format=tarfile.GNU_FORMAT) as t:
-        for arc, data, mode in sorted(files):
-            ti = tarfile.TarInfo(prefix + arc); ti.size = len(data); ti.mode = mode; ti.uid = ti.gid = 0; ti.mtime = 1761000000   # a zero timestamp makes some TVs refuse the package
-            t.addfile(ti, io.BytesIO(data))
+    with gzip.GzipFile(fileobj=b, mode='wb', mtime=1761000000) as gz:
+        with tarfile.open(fileobj=gz, mode='w', format=tarfile.GNU_FORMAT) as t:
+            for arc, data, mode in sorted(files):
+                ti = tarfile.TarInfo(arc); ti.size = len(data); ti.mode = mode; ti.uid = ti.gid = 0; ti.mtime = 1761000000
+                t.addfile(ti, io.BytesIO(data))
     return b.getvalue()
 
-def ar(parts):
-    blob = b'!<arch>\n'
-    for n, d in parts:
-        blob += ('%-16s%-12d%-6d%-6d%-8s%-10d`\n' % (n + '/', 0, 0, 0, '100644', len(d))).encode() + d + (b'\n' if len(d) % 2 else b'')
-    return blob
+def ipk(files):
+    manifest = {
+        'metadata': {'id': PKG, 'version': version, 'primaryApp': PKG, 'mtime': 1761000000,
+                     'control': {'Installed-Size': sum(len(d) for _, d, _ in files) // 1024 + 1,
+                                 'Maintainer': 'N/A <nobody@example.com>', 'Description': 'CleanYourTV for LG webOS'}},
+        'files': [{'path': arc, 'data': base64.b64encode(data).decode('ascii'), 'mode': mode} for arc, data, mode in files]
+    }
+    return subprocess.run(['node', P('ipk', 'pack.cjs')], input=json.dumps(manifest).encode(), stdout=subprocess.PIPE, check=True).stdout
 
 def write(name, data):
     path = os.path.join(DIST, name)
@@ -112,11 +117,6 @@ add_dir(data, s + '/payload/app', P('app'))
 if BUILD:
     add(data, s + '/BUILD', (BUILD + '\n').encode())
     add(data, s + '/payload/app/BUILD', (BUILD + '\n').encode())
-add(data, './usr/palm/packages/%s/packageinfo.json' % PKG, json.dumps({'id': PKG, 'version': version, 'app': PKG}).encode())
-
-size = sum(len(d) for _, d, _ in data) // 1024 + 1
-ctl = ('Package: %s\nVersion: %s\nSection: misc\nPriority: optional\nArchitecture: all\nInstalled-Size: %d\n'
-       'Maintainer: N/A <nobody@example.com>\nDescription: CleanYourTV for LG webOS\nwebOS-Package-Format-Version: 2\nwebOS-Packager-Version: x.y.x\n' % (PKG, version, size)).encode()
-write('%s_%s_all.ipk' % (PKG, version), ar([('debian-binary', b'2.0\n'), ('control.tar.gz', tgz([('control', ctl, 0o644)], './')), ('data.tar.gz', tgz(data))]))
+write('%s_%s_all.ipk' % (PKG, version), ipk(data))
 print('service %s, launcher %s' % (version, fe))
 if not SIGNING_KEY: print('UNSIGNED development build: automatic installation and updates will refuse it.')

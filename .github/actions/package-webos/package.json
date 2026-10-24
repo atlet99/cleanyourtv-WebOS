@@ -1,0 +1,8 @@
+{
+  "name": "cleanyourtv-packager-tools",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@atlet99/webos-packager-plugin": "2.2.0"
+  }
+}

@@ -20,18 +20,23 @@ reports from TVs that are not in the [tested list](../tested-tvs.md).
 | `voice/` | Source of the small speech program `cytv-asr` and its build script. |
 | `third-party/` | The bundled inputhook files and the QR library. |
 | `tools/` | `node8-check.sh`: service and theme checks under Node 8.12.0; `theme-docs.js`: regenerates the table of theme settings in the docs. |
-| `ipk/build.py` | Builds the release files. |
+| `ipk/build.py`, `ipk/pack.cjs` | Prepare release assets/signatures and build IPKs with the standalone packager 2.2.0. |
 | `compat.json` | The list of tested firmware the setup reads. |
 | `install.sh`, `uninstall.sh` | The installer and uninstaller. |
 | `docs/`, `zensical.toml` | This documentation. |
 
 ## Building
 
+Every push to `main` runs **Build IPK** and uploads the packages to the workflow's **Artifacts** section.
+You can also use **Run workflow** without building locally. See [IPK builds in GitHub Actions](ci-builds.md) for downloads,
+signing and the reusable action for other webOS apps.
+
 ```sh
-python3 ipk/build.py
+NODE_PATH=/path/to/isolated/node_modules python3 ipk/build.py
 ```
 
-writes the release files to `dist/`: `com.cleanyourtv.manager_<version>_all.ipk`, `frontend-<version>.tgz` and a `.sha256` file for
+writes the release files to `dist/`; [optional local tooling setup](ci-builds.md#optional-local-tooling) installs the pinned
+`@atlet99/webos-packager-plugin/core` dependency without webpack. The output is `com.cleanyourtv.manager_<version>_all.ipk`, `frontend-<version>.tgz` and a `.sha256` file for
 each. Attach them to a GitHub release tagged `v<version>`. The **service** version is `VERSION` in `helper/helper.js`; the
 **launcher** version is `app/version.json` and `VERSION` in `app/index.html` (the build refuses to run when they differ).
 

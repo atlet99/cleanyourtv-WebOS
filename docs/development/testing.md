@@ -39,10 +39,14 @@ go to a TV. The mock needs to answer `/api/apps`, `/api/live/*` and `/api/manage
 | Workflow | When | What |
 |---|---|---|
 | `test-build.yml` | Every push to a branch other than `main` | Runs the Node 8 checks, builds the package with the commit in a `BUILD` file and publishes it as the pre-release `test-<branch>` |
+| `build-ipk.yml` | Every push to `main`, or manual run | Checks and builds CleanYourTV; uploads downloadable IPK/launcher artifacts. Manual runs can package another prepared app with the isolated plugin |
 | `localization.yml` | Relevant pushes and pull requests, or manual run | Checks localisation dictionaries and rendering on Node 8.12.0 without release secrets |
 | `docs.yml` | Pushes that touch the documentation | Builds this site; deploys it to GitHub Pages from `main` |
 
 A test build appears in the manager app's **Update channel** list; see [Test builds](../managing.md#test-builds).
+For automatic package builds, signing settings and the reusable packaging action, see [IPK builds in GitHub Actions](ci-builds.md).
+Both main and test-branch IPK builds use the locked standalone packager **2.2.0**, installed only in the runner's temporary directory.
+`NODE_PATH=/path/to/isolated/node_modules python3 tools/package-check.py` checks signatures, multi-app metadata, modes, timestamps and byte reproducibility.
 
 ## Documentation
 

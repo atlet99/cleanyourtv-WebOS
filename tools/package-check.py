@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build with a temporary test key; inspect signatures and bundled pages. No TV is contacted."""
 import io
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -35,6 +36,11 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
                     header = data[offset:offset + 60]
                     size = int(header[48:58])
                     member = data[offset + 60:offset + 60 + size]
+                    if header[:16].decode().strip().rstrip('/') == 'control.tar.gz':
+                        with tarfile.open(fileobj=io.BytesIO(member), mode='r:gz') as control:
+                            assert all(m.mtime == 1761000000 for m in control.getmembers())
+                            text = control.extractfile('control').read().decode()
+                            assert 'Description: CleanYourTV for LG webOS\n' in text and 'Installed-Size: ' in text
                     if header[:16].decode().strip().rstrip('/') == 'data.tar.gz':
                         archive = tarfile.open(fileobj=io.BytesIO(member), mode='r:gz')
                         break
@@ -44,6 +50,7 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
             else:
                 archive = tarfile.open(asset, 'r:gz')
             with archive:
+                members = {m.name.removeprefix('./'): m for m in archive.getmembers()}
                 pages = [m for m in archive.getmembers() if m.name.endswith('/index.html')]
                 assert len(pages) == (4 if asset.suffix == '.ipk' else 1)
                 for page in pages:
@@ -52,13 +59,26 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
                     assert b'shared/api.js' not in html and b'shared/i18n.js' not in html
                     assert 'Телеканалы'.encode() in html
                 if asset.suffix == '.ipk':
-                    key = archive.extractfile('./usr/palm/services/com.cleanyourtv.manager.service/helper/release-public.pem').read()
+                    assert all(m.mtime == 1761000000 and m.uid == 0 and m.gid == 0 for m in archive.getmembers())
+                    service = 'usr/palm/services/com.cleanyourtv.manager.service/'
+                    key = archive.extractfile(members[service + 'helper/release-public.pem']).read()
                     assert key == public.read_bytes()
                     assert not any('private.pem' in m.name for m in archive.getmembers())
                     for app, title in [('picker', 'Источники'), ('notify', 'Уведомление')]:
-                        metadata = archive.extractfile('./usr/palm/applications/com.cleanyourtv.' + app + '/resources/ru/appinfo.json').read()
+                        metadata = archive.extractfile(members['usr/palm/applications/com.cleanyourtv.' + app + '/resources/ru/appinfo.json']).read()
                         assert json.loads(metadata)['title'] == title
-        print('ok   signed package/launcher, inlined offline assets, Russian catalogue/system titles and bundled public key')
+                    for executable in ['bootstrap.sh', 'scripts/10-cleanyourtv-home', 'scripts/15-cleanyourtv-debloat', 'voice/cytv-asr', 'inputhook/ezinject']:
+                        assert members[service + executable].mode == 0o755
+                    assert members[service + 'inputhook/libinputhookpp.so'].mode == 0o644
+                    package = json.load(archive.extractfile(members['usr/palm/packages/com.cleanyourtv.manager/packageinfo.json']))
+                    assert package['app'] == 'com.cleanyourtv.manager' and package['services'] == ['com.cleanyourtv.manager.service']
+                    for app in ['manager', 'picker', 'notify']:
+                        assert 'usr/palm/applications/com.cleanyourtv.' + app + '/appinfo.json' in members
+                    assert not any('node_modules/' in m.name for m in archive.getmembers())
+        checksums = {a.name: hashlib.sha256(a.read_bytes()).digest() for a in assets}
+        run('python3', 'ipk/build.py', env=env)
+        assert all(hashlib.sha256((ROOT / 'dist' / name).read_bytes()).digest() == value for name, value in checksums.items())
+        print('ok   standalone 2.2.0 multi-app IPK: signatures, explicit modes/mtime, reproducibility, offline UI and public key')
     finally:
         # Leave ordinary dev output, never a release signed by an ephemeral test identity.
         env = dict(os.environ)

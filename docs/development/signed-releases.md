@@ -20,12 +20,14 @@ Keep the private key offline or in a protected CI secret. Publish the public key
 trusted channel. This repository deliberately contains no generated production signing identity.
 
 ```sh
+NODE_PATH=/path/to/isolated/node_modules \
 CYTV_SIGNING_KEY=/secure/release-private.pem \
 CYTV_RELEASE_PUBLIC_KEY=/secure/release-public.pem \
 python3 ipk/build.py
 ```
 
-The build verifies its signatures and bundles the public key with the service. Without `CYTV_SIGNING_KEY`,
+The standalone packager 2.2.0 must be available in the isolated `NODE_PATH`; see [Tooling setup](ci-builds.md#optional-local-tooling).
+GitHub Actions sets this up automatically. The build verifies its signatures and bundles the public key with the service. Without `CYTV_SIGNING_KEY`,
 the result is an **unsigned development build**, which the updater refuses.
 For branch builds, configure GitHub Actions secret `CYTV_RELEASE_PRIVATE_KEY` and repository variable
 `CYTV_RELEASE_PUBLIC_KEY_PEM` with the PEM contents. Protect publishing branches: a workflow with access

@@ -1,0 +1,108 @@
+name: Build IPK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      app-directory:
+        description: "Optional: prepared app directory for the generic packager. Leave empty for CleanYourTV."
+        type: string
+        default: ""
+      service-directories:
+        description: "Optional JS service directories, one per line (generic packager only)."
+        type: string
+        default: ""
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        if: inputs.app-directory == ''
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        if: inputs.app-directory == ''
+        with:
+          node-version: "22"
+      - name: Install isolated standalone packager
+        if: inputs.app-directory == ''
+        id: packager
+        run: bash .github/actions/package-webos/setup.sh
+      - name: Check CleanYourTV on the TV's Node version
+        if: inputs.app-directory == ''
+        run: sh tools/node8-check.sh
+      - name: Check standalone packaging and legacy command
+        if: inputs.app-directory == ''
+        env:
+          NODE_PATH: ${{ steps.packager.outputs.directory }}/node_modules
+        run: python3 .github/actions/package-webos/check.py
+      - name: Build CleanYourTV package and launcher
+        if: inputs.app-directory == ''
+        id: cleanyourtv
+        env:
+          NODE_PATH: ${{ steps.packager.outputs.directory }}/node_modules
+          CYTV_RELEASE_PRIVATE_KEY: ${{ secrets.CYTV_RELEASE_PRIVATE_KEY }}
+          CYTV_RELEASE_PUBLIC_KEY_PEM: ${{ vars.CYTV_RELEASE_PUBLIC_KEY_PEM }}
+        run: |
+          set -euo pipefail
+          export CYTV_BUILD="${GITHUB_SHA::7}"
+          if [ -z "$CYTV_RELEASE_PRIVATE_KEY" ] && [ -z "$CYTV_RELEASE_PUBLIC_KEY_PEM" ]; then
+            python3 ipk/build.py
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          else
+            test -n "$CYTV_RELEASE_PRIVATE_KEY" && test -n "$CYTV_RELEASE_PUBLIC_KEY_PEM" || { echo "Both release keys must be configured together"; exit 1; }
+            umask 077
+            keydir=$(mktemp -d "$RUNNER_TEMP/cytv-signing.XXXXXX")
+            trap 'rm -rf "$keydir"' EXIT
+            printf '%s\n' "$CYTV_RELEASE_PRIVATE_KEY" > "$keydir/private.pem"
+            printf '%s\n' "$CYTV_RELEASE_PUBLIC_KEY_PEM" > "$keydir/public.pem"
+            CYTV_SIGNING_KEY="$keydir/private.pem" CYTV_RELEASE_PUBLIC_KEY="$keydir/public.pem" python3 ipk/build.py
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Package another prepared webOS app
+        if: inputs.app-directory != ''
+        uses: ./.github/actions/package-webos
+        with:
+          app-directory: ${{ inputs.app-directory }}
+          service-directories: ${{ inputs.service-directories }}
+      - name: Verify artifact checksums
+        working-directory: dist
+        run: sha256sum --check ./*.sha256
+      - name: Upload downloadable packages
+        id: artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webos-ipk-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            dist/*.ipk
+            dist/*.tgz
+            dist/*.sha256
+            dist/*.sha256.sig
+          if-no-files-found: error
+          retention-days: 30
+      - name: Build summary
+        env:
+          ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
+          SIGNED: ${{ steps.cleanyourtv.outputs.signed }}
+        run: |
+          {
+            echo '## webOS packages'
+            echo "Download: $ARTIFACT_URL"
+            if [ "$SIGNED" = true ]; then
+              echo 'CleanYourTV release signatures verified during packaging.'
+            elif [ "$SIGNED" = false ]; then
+              echo 'Unsigned build: suitable for explicit local installation; the CleanYourTV automatic updater requires signed releases.'
+            else
+              echo 'Prepared application packaged with @atlet99/webos-packager-plugin. SHA-256 checksums verified.'
+            fi
+            echo 'The artifact is retained for 30 days. This workflow does not publish a GitHub Release.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove isolated packager
+        if: always() && steps.packager.outputs.directory != ''
+        env:
+          TOOLING_DIRECTORY: ${{ steps.packager.outputs.directory }}
+        run: rm -rf -- "$TOOLING_DIRECTORY"
