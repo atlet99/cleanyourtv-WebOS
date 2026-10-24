@@ -55,7 +55,10 @@ jobs:
             python3 ipk/build.py
             echo "signed=false" >> "$GITHUB_OUTPUT"
           else
-            test -n "$CYTV_RELEASE_PRIVATE_KEY" && test -n "$CYTV_RELEASE_PUBLIC_KEY_PEM" || { echo "Both release keys must be configured together"; exit 1; }
+            if [ -z "$CYTV_RELEASE_PRIVATE_KEY" ] || [ -z "$CYTV_RELEASE_PUBLIC_KEY_PEM" ]; then
+              echo "Both release keys must be configured together"
+              exit 1
+            fi
             umask 077
             keydir=$(mktemp -d "$RUNNER_TEMP/cytv-signing.XXXXXX")
             trap 'rm -rf "$keydir"' EXIT
