@@ -55,9 +55,10 @@ The release job exposes `new_release_published` and `new_release_version` for fu
 | GitHub setting | Name |
 |---|---|
 | Actions secret | `CYTV_RELEASE_PRIVATE_KEY` |
-| Actions variable | `CYTV_RELEASE_PUBLIC_KEY_PEM` |
+| Actions secret or variable | `CYTV_RELEASE_PUBLIC_KEY_PEM` |
 
 Both contain the PEM contents described in [Signed releases](signed-releases.md).
+The public key can be stored in Secrets or Variables; if both are set, the Secret takes precedence.
 Stable releases **require both keys**. Missing/invalid keys fail the release job before a tag or public release is created.
 Private key files are kept only in a private temporary runner directory and deleted after signing.
 CI preview packages use fresh temporary test keys for verification and leave only unsigned preview output.

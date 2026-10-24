@@ -47,7 +47,7 @@ jobs:
         env:
           NODE_PATH: ${{ steps.packager.outputs.directory }}/node_modules
           CYTV_RELEASE_PRIVATE_KEY: ${{ secrets.CYTV_RELEASE_PRIVATE_KEY }}
-          CYTV_RELEASE_PUBLIC_KEY_PEM: ${{ vars.CYTV_RELEASE_PUBLIC_KEY_PEM }}
+          CYTV_RELEASE_PUBLIC_KEY_PEM: ${{ secrets.CYTV_RELEASE_PUBLIC_KEY_PEM || vars.CYTV_RELEASE_PUBLIC_KEY_PEM }}
         run: |
           set -euo pipefail
           export CYTV_BUILD="${GITHUB_SHA::7}"

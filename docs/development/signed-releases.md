@@ -30,8 +30,8 @@ python3 ipk/build.py
 The standalone packager 2.2.0 must be available in the isolated `NODE_PATH`; see [Tooling setup](ci-builds.md#optional-local-checks).
 GitHub Actions sets this up automatically. The build verifies its signatures and bundles the public key with the service. Without `CYTV_SIGNING_KEY`,
 the result is an **unsigned development build**, which the updater refuses.
-For automatic stable releases and explicitly requested test builds, configure GitHub Actions secret `CYTV_RELEASE_PRIVATE_KEY` and repository variable
-`CYTV_RELEASE_PUBLIC_KEY_PEM` with the PEM contents. Protect publishing branches: a workflow with access
+For automatic stable releases and explicitly requested test builds, configure GitHub Actions secret `CYTV_RELEASE_PRIVATE_KEY` and an Actions secret or repository variable
+`CYTV_RELEASE_PUBLIC_KEY_PEM` with the PEM contents (the public-key Secret takes precedence over the Variable). Protect publishing branches: a workflow with access
 to the secret can sign a release. Pull-request checks never receive production keys.
 The [Release workflow](ci-builds.md) publishes a checked commit only after both assets and signatures have been uploaded successfully.
 
