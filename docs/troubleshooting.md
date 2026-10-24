@@ -7,6 +7,10 @@
 - **An app is missing from the grid.** Check **Hidden apps** in Customise. Apps without a launch icon are not listed.
 - **After a firmware update removed root.** Re-root, then run the [install command](install.md#1-install-the-manager-app) and the setup again.
 - **The Input key opens LG's picker.** Check the Input key switch in the manager app and run **Learn the Input key**.
+- **The UI freezes a few seconds after start.** Older versions kept the Inputs picker running hidden, and on some firmware
+  a hidden overlay app keeps the remote. Update to the current release: the picker now runs only while the Input list is
+  open and is closed afterwards ([the Input key](input-key.md)). If it still happens, attach **Share log** — the
+  `picker show` / `picker hide` / `picker released` lines show whether an overlay was left up.
 - **`FAILED_IPKG_INSTALL`.** Remove the `com.cleanyourtv.manager` entry marked `half-installed` from
   `/media/developer/apps/var/lib/opkg/status` and install again.
 - **Live TV shows the setup code again.** The playlist address was reset or never saved; run the pairing again, or send it with
