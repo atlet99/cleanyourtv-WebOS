@@ -1,6 +1,6 @@
 // Live TV backend for the launcher: reads an M3U playlist (and its XMLTV guide), serves them to the Live TV app,
 // and runs a short-lived pairing page on the LAN so the playlist address can be entered from a phone or computer.
-const http = require('http'), https = require('https'), fs = require('fs'), os = require('os'), zlib = require('zlib'), crypto = require('crypto');
+const http = require('http'), https = require('https'), fs = require('fs'), os = require('os'), zlib = require('zlib'), crypto = require('crypto'), { PassThrough } = require('stream');
 const nc = require('./netcompat'), { URL, URLSearchParams } = nc;
 const DIR = process.env.CYTV_LIVE_DIR || '/media/developer/cleanyourtv/live';
 const SETTINGS = DIR + '/settings.json', PLAYLIST = DIR + '/playlist.json', EPG = DIR + '/epg.json', STATE = DIR + '/state.json';
@@ -151,15 +151,69 @@ function xmltvTime(s) {
   if (m[7]) { const sign = m[7][0] === '-' ? -1 : 1; t -= sign * (+m[7].slice(1, 3) * 60 + +m[7].slice(3, 5)) * 60000; }
   return Math.floor(t / 1000);
 }
-async function loadEpg(url, wantedIds) {
-  const stream = await get(url), want = new Set(wantedIds), byId = {};
+// Guide matching: a guide's channel id rarely equals tvg-id verbatim — punctuation differs ('TVP.1' vs 'TVP 1') and
+// some guides simply use the display name as the id. Order: exact id, then punctuation-insensitive id/name.
+const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+// Xtream playlists are get.php?username=…&password=…; the provider's guide is the same host's xmltv.php with the same credentials.
+const xtreamEpg = playlistUrl => {
+  let u; try { u = new URL(playlistUrl); } catch (_) { return ''; }
+  if (!/\/get\.php$/i.test(u.pathname)) return '';
+  const user = u.searchParams.get('username'), pass = u.searchParams.get('password');
+  if (!user || !pass) return '';
+  return u.protocol + '//' + u.host + '/xmltv.php?username=' + encodeURIComponent(user) + '&password=' + encodeURIComponent(pass);
+};
+// The answer may be gzipped with or without a content-encoding header (.xml.gz files in particular), and get() already
+// unwraps the header case: sniff the magic bytes instead of trusting either, so a correct header is never decoded twice.
+const sniffGzip = s => new Promise((resolve, reject) => {
+  s.once('readable', () => {
+    let first = s.read() || Buffer.alloc(0);
+    while (first.length < 2) { const more = s.read(); if (!more) break; first = Buffer.concat([first, more]); }   // a 1-byte first chunk must not hide the magic bytes
+    if (first.length > 1 && first[0] === 0x1f && first[1] === 0x8b) {
+      const gz = zlib.createGunzip();
+      // errors must reach the exposed stream even after resolve(), or loadEpg would wait forever on a dropped connection
+      const fail = e => gz.destroy(e);
+      s.on('error', fail); s.pipe(gz); gz.write(first);
+      resolve(gz);
+    } else {
+      const pt = new PassThrough();
+      s.on('error', e => pt.destroy(e));
+      pt.write(first); s.pipe(pt);
+      resolve(pt);
+    }
+  });
+  s.on('error', reject);
+});
+async function loadEpg(url, channels) {
+  const stream = await sniffGzip(await get(url));
+  const want = new Set(), byNorm = {};
+  for (const c of channels) {
+    if (!c.id) continue;
+    want.add(c.id);
+    const n = norm(c.name), i = norm(c.id);
+    if (n && byNorm[n] === undefined) byNorm[n] = c.id;
+    if (i && byNorm[i] === undefined) byNorm[i] = c.id;
+  }
+  // guides repeat the same ids across programmes: normalise once per distinct id, not once per programme line
+  const seen = {};
+  const idOf = g => {
+    if (want.has(g)) return g;
+    if (seen[g] !== undefined) return seen[g];
+    const r = byNorm[norm(g)] || '';
+    seen[g] = r; return r;
+  };
   const now = Math.floor(Date.now() / 1000), from = now - 3600, to = now + 36 * 3600;
-  let buf = '', cur = null, count = 0;
+  let buf = '', cur = null, count = 0, byId = {};
   const handle = line => {
     let m;
-    if ((m = line.match(/<programme\b[^>]*\bchannel="([^"]*)"[^>]*\bstart="([^"]*)"[^>]*\bstop="([^"]*)"/))) cur = want.has(m[1]) ? { id: m[1], s: xmltvTime(m[2]), e: xmltvTime(m[3]), t: '', d: '' } : null;
-    else if (cur && !cur.t && (m = line.match(/<title[^>]*>([^<]*)<\/title>/))) cur.t = decode(m[1]);
-    else if (cur && !cur.d && (m = line.match(/<desc[^>]*>([^<]*)<\/desc>/))) cur.d = decode(m[1]).slice(0, 220);
+    if (line.indexOf('<programme') >= 0 && line.match(/<programme\b/)) {   // attributes in any order: most guides write start/stop before channel
+      const a = {};
+      line.replace(/([\w-]+)="([^"]*)"/g, (_, k, v) => { a[k.toLowerCase()] = v; return ''; });
+      const id = a.channel ? idOf(decode(a.channel)) : '';
+      cur = id ? { id, s: xmltvTime(a.start || ''), e: xmltvTime(a.stop || ''), t: '', d: '' } : null;
+    }
+    // not an else: some guides keep <programme …><title>…</title></programme> on one line
+    if (cur && !cur.t && (m = line.match(/<title[^>]*>([^<]*)<\/title>/))) cur.t = decode(m[1]);
+    if (cur && !cur.d && (m = line.match(/<desc[^>]*>([^<]*)<\/desc>/))) cur.d = decode(m[1]).slice(0, 220);
     if (cur && line.includes('</programme>')) {
       if (cur.e > from && cur.s < to && !/^no data$/i.test(cur.t.trim())) { (byId[cur.id] = byId[cur.id] || []).push(cur.d ? [cur.s, cur.e, cur.t, cur.d] : [cur.s, cur.e, cur.t]); count++; }
       cur = null;
@@ -168,14 +222,17 @@ async function loadEpg(url, wantedIds) {
   await new Promise((resolve, reject) => {
     let n = 0;
     stream.on('data', chunk => {
-      buf += chunk; let i;
-      while ((i = buf.indexOf('\n')) >= 0) { handle(buf.slice(0, i)); buf = buf.slice(i + 1); }
+      buf += chunk; let p;
+      // segment on <programme boundaries: a minified guide without any newlines must not pile up in memory, and a
+      // line holding several programmes is still parsed one by one. Between chunks at most one programme is buffered.
+      while ((p = buf.indexOf('<programme', 1)) > 0) { handle(buf.slice(0, p)); buf = buf.slice(p); }
       if (++n % 40 === 0) { stream.pause(); setImmediate(() => stream.resume()); }   // leave CPU for the UI
     });
-    stream.on('end', resolve); stream.on('error', reject);
+    stream.on('end', () => { if (buf) handle(buf); resolve(); });   // the last programme needs no trailing newline
+    stream.on('error', reject);
   });
   for (const id in byId) byId[id].sort((a, b) => a[0] - b[0]);
-  return { v: 3, fetchedAt: Date.now(), count, byId };
+  return { v: 4, fetchedAt: Date.now(), count, byId };
 }
 
 let refreshing = false;
@@ -189,17 +246,16 @@ async function refresh(force) {
       writeJson(PLAYLIST, playlist);
     }
     status = { state: 'idle', error: '' };
-    const epgUrl = settings.epgUrl || playlist.epgUrl;
-    if (epgUrl && (force || !epg || epg.v !== 3 || Date.now() - epg.fetchedAt > REFRESH_MS)) {
+    const epgUrl = settings.epgUrl || playlist.epgUrl || xtreamEpg(settings.playlistUrl);
+    if (epgUrl && (force || !epg || epg.v !== 4 || Date.now() - epg.fetchedAt > REFRESH_MS)) {
       status = { state: 'loading guide', error: '' };
-      try { epg = await loadEpg(epgUrl, playlist.channels.map(c => c.id).filter(Boolean)); writeJson(EPG, epg); }
+      try { epg = await loadEpg(epgUrl, playlist.channels); writeJson(EPG, epg); }
       catch (e) { status = { state: 'idle', error: 'guide: ' + e.message }; }
     }
     if (status.state !== 'idle') status = { state: 'idle', error: status.error };
   } catch (e) { status = { state: 'idle', error: e.message }; }
   refreshing = false;
 }
-
 // ---- pairing page (LAN, short-lived, needs the code shown on the TV) ----
 let pair = null;
 function lanIp() {
@@ -291,4 +347,4 @@ async function handle(req, res, u, body) {
 if (settings.playlistUrl) setTimeout(() => refresh(false), 20000);
 setInterval(() => refresh(false), 6 * 3600 * 1000).unref();
 
-module.exports = { handle, parseM3U, probe };
+module.exports = { handle, parseM3U, probe, loadEpg, xtreamEpg };

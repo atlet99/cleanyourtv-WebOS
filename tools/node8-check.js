@@ -2,7 +2,7 @@
 //   node tools/node8-check.js
 // It parses every service file, loads the modules and runs the parts that used APIs Node 8 lacks (pairing code, URL and
 // form handling, outgoing http requests, mkdir -p) against a local server. Nothing leaves this machine.
-const fs = require('fs'), os = require('os'), path = require('path'), http = require('http'), cp = require('child_process'), vm = require('vm');
+const fs = require('fs'), os = require('os'), path = require('path'), http = require('http'), cp = require('child_process'), vm = require('vm'), zlib = require('zlib');
 const root = path.join(__dirname, '..'), helper = path.join(root, 'helper');
 let failed = 0;
 const ok = (c, name) => { console.log((c ? 'ok   ' : 'FAIL ') + name); if (!c) failed++; };
@@ -23,12 +23,26 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
   let b = ''; const rq = nc.request(http, url, { method, headers: { 'content-type': 'application/x-www-form-urlencoded', 'content-length': Buffer.byteLength(body || '') }, timeout: 4000 }, r => { r.on('data', c => b += c); r.on('end', () => resolve({ status: r.statusCode, body: b })); });
   rq.on('error', reject); rq.end(body || '');
 });
-const fake = (url, method) => { const res = { code: 0, out: '', writeHead(c) { this.code = c; }, end(s) { this.out = s || ''; } }; return { req: { url, method: method || 'GET', headers: {} }, res }; };
+  const fake = (url, method) => { const res = { code: 0, out: '', writeHead(c) { this.code = c; }, end(s) { this.out = s || ''; } }; return { req: { url, method: method || 'GET', headers: {} }, res }; };
+  // XMLTV fixture: start/stop before channel (the common attribute order), a guide id that equals the playlist
+  // channel's display name, an exact id, and one that differs from tvg-id only by punctuation.
+  const stamp = ms => new Date(Date.now() + ms).toISOString().replace(/\D/g, '').slice(0, 14) + ' +0000';
+  const guideXml = ['<?xml version="1.0"?>', '<tv>',
+    '<channel id="TVP 1"><display-name>TVP 1</display-name></channel>',
+    '<programme start="' + stamp(0) + '" stop="' + stamp(3600000) + '" channel="TVP 1"><title>News</title><desc>Morning</desc></programme>',
+    '<programme start="' + stamp(3600000) + '" stop="' + stamp(7200000) + '" channel="tvpoland.news"><title>Talk</title></programme>',
+    '<programme start="' + stamp(7200000) + '" stop="' + stamp(10800000) + '" channel="tvpoland news"><title>Late</title></programme>',
+    '</tv>'].join('\n');
 
 (async () => {
   // 3. compatibility layer against a local server
   const srv = http.createServer((q, r) => { r.writeHead(200, { 'x-path': q.url, 'x-ua': q.headers['user-agent'] || '' });
     if (q.url === '/pl.m3u') return r.end('#EXTM3U\n#EXTINF:-1 group-title="G",Chan A\nhttp://127.0.0.1:1/live/u/p/1.m3u8\n');
+    if (q.url === '/guide.xml') return r.end(guideXml);
+    if (q.url === '/guide.xml.gz') return r.end(zlib.gzipSync(Buffer.from(guideXml)));
+    if (q.url === '/guide-hdr.xml.gz') { r.writeHead(200, { 'content-encoding': 'gzip' }); return r.end(zlib.gzipSync(Buffer.from(guideXml))); }
+    if (q.url === '/guide-broken.gz') { r.writeHead(200, { 'content-encoding': 'gzip' }); r.write(zlib.gzipSync(Buffer.from(guideXml)).slice(0, 40)); return setTimeout(() => q.destroy(), 30); }
+    if (q.url === '/guide.min.xml') return r.end(guideXml.replace(/\n/g, ''));
     r.end(q.method); }).listen(0, '127.0.0.1');
   await new Promise(r => srv.on('listening', r));
   const port = srv.address().port;
@@ -98,6 +112,28 @@ const fake = (url, method) => { const res = { code: 0, out: '', writeHead(c) { t
   f = fake('/api/live/probe?key=zzzzzzzzzz&i=0'); await live.handle(f.req, f.res, '/api/live/probe', async () => ({})); ok(f.res.code === 404, 'probe: only streams of the playlist are asked about');
   ps.close();
   f = fake('/api/live/reset', 'POST'); await live.handle(f.req, f.res, '/api/live/reset', async () => ({}));
+
+  // 4b2. guide: attribute order, id/name matching, .xml.gz and the Xtream guide address
+  const chans = [{ id: 'ch1', name: 'TVP 1' }, { id: 'tvpoland.news', name: 'TV Poland News' }];
+  const e1 = await live.loadEpg('http://127.0.0.1:' + port + '/guide.xml', chans);
+  ok(e1.count === 3 && e1.byId.ch1.length === 1 && e1.byId.ch1[0][2] === 'News' && e1.byId.ch1[0][3] === 'Morning'
+    && e1.byId['tvpoland.news'].length === 2 && e1.byId['tvpoland.news'][0][2] === 'Talk' && e1.byId['tvpoland.news'][1][2] === 'Late',
+    'guide: start/stop before channel, exact ids, display-name ids and punctuation-only differences all match');
+  const e2 = await live.loadEpg('http://127.0.0.1:' + port + '/guide.xml.gz', chans);
+  ok(e2.count === 3, 'guide: a .xml.gz source without a gzip content-encoding header loads');
+  const e4 = await live.loadEpg('http://127.0.0.1:' + port + '/guide.min.xml', chans);
+  ok(e4.count === 3 && e4.byId.ch1[0][2] === 'News' && e4.byId['tvpoland.news'][1][2] === 'Late',
+    'guide: a minified single-line XMLTV loads with bounded memory and keeps its last programme');
+  const e3 = await live.loadEpg('http://127.0.0.1:' + port + '/guide-hdr.xml.gz', chans);
+  ok(e3.count === 3, 'guide: a .xml.gz sent with a proper content-encoding header is not decoded twice');
+  const broken = live.loadEpg('http://127.0.0.1:' + port + '/guide-broken.gz', chans);
+  const verdict = await Promise.race([broken.then(() => 'accepted', () => 'rejected'), new Promise(r => setTimeout(() => r('hung'), 3000))]);
+  broken.catch(() => {});
+  ok(verdict === 'rejected', 'guide: a connection dropped mid-gzip rejects instead of hanging the refresh');
+  ok(live.xtreamEpg('http://h:8080/get.php?username=u%20x&password=p&type=m3u_plus') === 'http://h:8080/xmltv.php?username=u%20x&password=p',
+    'guide: the Xtream guide address is derived from a get.php playlist address');
+  ok(live.xtreamEpg('http://h/playlist.m3u') === '' && live.xtreamEpg('http://h/get.php?type=m3u_plus') === '' && live.xtreamEpg('::bad') === '',
+    'guide: no Xtream derivation without get.php or credentials');
 
   // 4c. player variant order, extracted from the launcher page so the inline script cannot drift
   const vfSrc = /\n  function variantsFor\(url\)\{[\s\S]*?\n  \}/.exec(fs.readFileSync(path.join(root, 'app', 'index.html'), 'utf8'));

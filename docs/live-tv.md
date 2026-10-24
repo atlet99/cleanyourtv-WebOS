@@ -61,7 +61,9 @@ the [Input key](input-key.md).
 - Stepping through channels with Up/Down starts the new channel only when the keys have paused for 180 ms. Channels you skip
   are never requested from your provider, which matters for accounts that allow one connection.
 - The player uses one video element for the whole session instead of creating one per channel.
-- The guide (XMLTV) is refreshed twice a day and keeps 36 hours.
+- The guide (XMLTV) is refreshed twice a day and keeps 36 hours. Guides with attributes in any order, punctuation-only id
+  differences, name-based ids and `.xml.gz` sources all work. An Xtream playlist (`get.php?username=…`) without a guide
+  address uses the provider's guide automatically.
 - When a playlist lists the same channel in several qualities (for example `HD` and `SD`), they are merged into one channel with
   several streams. If one does not start, the next is tried; a stream that stalls is reloaded once.
 - When a channel does not play, the screen says why: the server refused it, the stream is gone, it needs DRM, it is not video, or
