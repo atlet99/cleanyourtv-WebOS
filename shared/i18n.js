@@ -257,7 +257,9 @@
     'not a test build':'Недопустимый идентификатор тестовой сборки', 'unknown action':'Неизвестная операция',
     'not a valid address':'Некорректный адрес', 'address must start with http:// or https://':'Адрес должен начинаться с http:// или https://',
     'timed out':'Время ожидания истекло', 'nothing to show':'В уведомлении нет текста или изображения',
-    'Home Assistant: {0}':'Home Assistant: {0}', 'OpenRouter: {0}':'OpenRouter: {0}', 'Notification':'Уведомление'
+    'Home Assistant: {0}':'Home Assistant: {0}', 'OpenRouter: {0}':'OpenRouter: {0}', 'Notification':'Уведомление',
+    'Running apps':'Запущенные приложения', 'Close all':'Закрыть все', 'No running apps':'Нет запущенных приложений',
+    'Could not read the running apps':'Не удалось получить список запущенных приложений', 'Could not close the app':'Не удалось закрыть приложение'
   };
   var HELP = {
     'Launcher':'Главный экран телевизора. Перед обновлением проверяются цифровая подпись выпуска и SHA-256. Если новая версия не запустится, будет восстановлена предыдущая.',

@@ -74,6 +74,8 @@ let inputhook = { ensure() {}, status() { return {}; } };
 try { inputhook = require('./inputhook'); } catch (e) { console.error('inputhook module failed:', e.message); }
 let picker = { release: () => ({ returnValue: false }), status: () => ({ mode: 'ondemand' }) };
 try { picker = require('./picker'); } catch (e) { console.error('picker module failed:', e.message); }
+let running = null;
+try { running = require('./running').create({ luna: luna }); } catch (e) { console.error('running module failed:', e.message); }
 const options = () => Object.assign({ debloat: true, inputKey: true, liveTv: true }, readConf().options || {});
 const keyCode = () => String(((readConf().keys || {}).input) || '241');
 const voiceKey = () => { const v = readConf().voice || {}; return v.enabled && voice && voice.installed() ? String((readConf().keys || {}).voice || '') : ''; };
@@ -112,6 +114,7 @@ http.createServer(async (req, res) => {
     if (voice && u.startsWith('/api/voice/')) return voice.handle(req, res, u, body);
     if (live && u.startsWith('/api/live/')) return live.handle(req, res, u, body);
     if (theme && u.startsWith('/api/theme/')) return theme.handle(req, res, u, body);
+    if (running && u.startsWith('/api/running')) return running.handle(req, res, u, body);
     if (u === '/api/log') { if (/picker show/.test(decodeURIComponent(req.url.split('m=')[1] || ''))) pickerShownAt = Date.now(); console.log(fs.readFileSync('/proc/uptime', 'utf8').split(' ')[0] + ' ' + decodeURIComponent((req.url.split('m=')[1] || '')).slice(0, 300)); return json({}); }   // small diagnostics from the overlay apps
     if (u === '/api/picker/release' && req.method === 'POST') return json(await picker.release(luna));   // the picker page is done: close the app, nothing stays hidden
     if (manager && u.startsWith('/api/manager/')) return manager.handle(req, res, u, body);

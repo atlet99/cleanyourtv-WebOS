@@ -316,6 +316,57 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
   await vask('set', { llm: { clearKey: true } }); r = await vask('ask', { text: 'turn on the light', card: false }); ok(!r.j.answer && /Home Assistant:/.test(r.j.error), 'Home Assistant unreachable and no AI: the error is reported');
   await vask('set', { ha: { clear: true } }); r = await vask('status', null, 'GET'); ok(r.j.ha.configured === false && r.j.ha.hasToken === false, 'removing Home Assistant clears the address and token');
   haSrv.close(); orSrv.close();
+  // 8b. the Running apps menu: what listApps knows minus Home and CleanYourTV's own apps (issue #8)
+  {
+    const APPS = [{ id: 'com.webos.app.home', title: 'Home' }, { id: 'netflix', title: 'Netflix' },
+      { id: 'com.cleanyourtv.manager', title: 'Manager' }, { id: 'com.cleanyourtv.picker', title: 'Picker' }, { id: 'hidden.app', title: 'Hidden' }];
+    const RUNNING = [{ appId: 'com.webos.app.home' }, { appId: 'netflix' }, { appId: 'com.cleanyourtv.manager' },
+      { appId: 'hidden.app' }, { id: 'unknown.app' }, { appId: 'netflix' }];
+    let failClose = false;
+    const calls = [];
+    const luna = async (uri, p) => { calls.push([uri, p]);
+      if (/listApps$/.test(uri)) return { apps: APPS };
+      if (/\/running$/.test(uri)) return { running: RUNNING };
+      if (/closeByAppId$/.test(uri)) return failClose ? { returnValue: false, errorText: 'refused' } : { returnValue: true };
+      if (/applicationManager\/close$/.test(uri)) return { returnValue: true };
+      if (/removeRecent$/.test(uri)) return { returnValue: false, errorText: 'no such service' };
+      return { returnValue: false };
+    };
+    const mod = require(path.join(helper, 'running'));
+    ok(mod.pick([{ appId: 'a.app' }, { id: 'b.app' }, { appId: 'a.app' }], [{ id: 'a.app', title: 'A' }, { id: 'b.app' }]).map(a => a.id).join() === 'a.app,b.app',
+      'running pick: id and appId entries are deduplicated and take their title from listApps');
+    const run = mod.create({ luna: luna });
+    let l = await run.list();
+    ok(l.apps.map(a => a.id).join() === 'netflix,hidden.app',
+      'running: Home, own apps, apps the launcher does not know and duplicates are not listed');
+    const ask2 = async (act, body, method) => { const x = fake('/api/running' + act, method || 'GET'); await run.handle(x.req, x.res, '/api/running' + act, async () => body || {}); return { code: x.res.code, j: JSON.parse(x.res.out) }; };
+    r = await ask2('/close', { id: 'com.webos.app.home' }, 'POST');
+    ok(r.j.returnValue === false && r.j.errorText === 'not a running app' && calls.every(c => !/close/.test(c[0])),
+      'running: Home cannot be closed through the route');
+    r = await ask2('/close', { id: 'com.cleanyourtv.manager' }, 'POST');
+    ok(r.j.returnValue === false, 'running: CleanYourTV apps cannot be closed through the route');
+    r = await ask2('/close', { id: 'unknown.app' }, 'POST');
+    ok(r.j.returnValue === false, 'running: an app that is not on the list is refused');
+    let c0 = calls.length;
+    r = await ask2('/close', { id: 'netflix' }, 'POST');
+    ok(r.j.returnValue === true && r.j.closed.join() === 'netflix'
+      && calls.slice(c0).some(c => /closeByAppId$/.test(c[0]) && c[1].id === 'netflix')
+      && calls.slice(c0).some(c => /removeRecent$/.test(c[0]) && c[1].appId === 'netflix'),
+      'running: a listed app is closed and dropped from LG\'s recents (which may refuse, and that is ignored)');
+    c0 = calls.length;
+    failClose = true;
+    r = await ask2('/close', { id: 'netflix' }, 'POST');
+    ok(r.j.returnValue === true && calls.slice(c0).some(c => /closeByAppId$/.test(c[0]) && c[1].id === 'netflix')
+      && calls.slice(c0).some(c => /applicationManager\/close$/.test(c[0]) && c[1].id === 'netflix')
+      && calls.slice(c0).some(c => /removeRecent$/.test(c[0])),
+      'running: when closeByAppId fails, plain close is the fallback and the app still leaves the recents');
+    failClose = false;
+    c0 = calls.length;
+    r = await ask2('/close', { all: true }, 'POST');
+    ok(r.j.returnValue === true && r.j.closed.join() === 'netflix,hidden.app' && calls.slice(c0).filter(c => /closeByAppId/.test(c[0])).length === 2,
+      'running: close all closes every listed app, and only those');
+  }
+
   // 9. Themes: bundled files are valid, values are whitelisted and clamped, extends works, set / revert work, wallpapers only from the bundled folder
   const themeMod = require(path.join(helper, 'theme')), tdir = path.join(root, 'themes');
   const bundled = fs.readdirSync(tdir).filter(n => /\.json$/.test(n));
@@ -428,6 +479,8 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
     svc.stderr.on('data', c => errs.push(String(c)));
     for (let i = 0; i < 40; i++) { try { await call2('GET', '/api/version'); break; } catch (_) { await new Promise(r => setTimeout(r, 250)); } }
     const st = await call2('GET', '/api/manager/status');
+    const run = await call2('GET', '/api/running');
+    ok(run.status === 200 && Array.isArray(run.j.apps), 'the running-apps route is mounted in the real service (no luna here: an empty list is fine)');
     ok(st.j.options.inputKey === false && st.j.options.debloat === true && st.j.options.liveTv === false,
       'status reports the stored options after the update, defaults did not shadow them');
     ok(st.j.keys.input === '55' && st.j.keys.guide === '88' && st.j.keys.learned === true, 'status reports the stored learned keys');
