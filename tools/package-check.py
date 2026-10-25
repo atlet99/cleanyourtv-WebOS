@@ -109,6 +109,16 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
                     launcher = archive.extractfile(members['app/index.html']).read()
                     assert b"v.addEventListener('error',onError,true)" in launcher
                     assert b".test(url))return [{src:url,type:''},{src:url,type:'application/x-mpegURL'}" in launcher
+        # Exercise the actual Pages command on the signed IPK, not just the feed's small offline fixtures.
+        site = Path(temp) / 'pages'
+        site.mkdir()
+        (site / 'index.html').write_text('existing documentation')
+        run('python3', 'tools/make-repo-feed.py', 'build', '--dist', 'dist', '--out', str(site / 'repo'),
+            '--base-url', 'https://example.github.io/project/repo', '--root', 'https://example.github.io/project', '--public-key', str(public))
+        feed = json.loads((site / 'repo/apps.json').read_text())
+        assert feed['packages'][0]['manifest']['version'] == '9.8.7'
+        assert (site / 'repo/com.cleanyourtv.manager_9.8.7_all.ipk').read_bytes() == (ROOT / 'dist/com.cleanyourtv.manager_9.8.7_all.ipk').read_bytes()
+        assert (site / 'index.html').read_text() == 'existing documentation'
         checksums = {a.name: hashlib.sha256(a.read_bytes()).digest() for a in assets}
         run('python3', 'ipk/build.py', env=env)
         assert all(hashlib.sha256((ROOT / 'dist' / name).read_bytes()).digest() == value for name, value in checksums.items())

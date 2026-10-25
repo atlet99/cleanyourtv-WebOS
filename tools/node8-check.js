@@ -246,6 +246,13 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
   r = await ask('status', 'GET'); ok(r.j.frontend.previous === null, 'rollback does not offer a launcher pointing to the removed service directory');
   fs.writeFileSync(path.join(previousDir, 'version.json'), JSON.stringify({ version: '1.4.13', apiVersion: 3 }));
   r = await ask('status', 'GET'); ok(r.j.frontend.previous === '1.4.13', 'rollback offers a previous launcher that supports the authenticated API');
+  const shippedClient = path.join(tmp, 'shipped-client.json'), cachedClient = path.join(tmp, 'cached-client.json');
+  fs.writeFileSync(shippedClient, JSON.stringify({ version: '1.4.13', apiVersion: 3 }));
+  fs.writeFileSync(cachedClient, JSON.stringify({ version: '9.0.0', apiVersion: 2 }));
+  const clientFormat = () => cp.spawnSync(process.execPath, [path.join(root, 'scripts/jtool.js'), 'api-mismatch', shippedClient, cachedClient]).status;
+  ok(clientFormat() === 0, 'bootstrap replaces an incompatible cached auth path even if its version number is higher');
+  fs.writeFileSync(cachedClient, JSON.stringify({ version: '9.0.0', apiVersion: 3 }));
+  ok(clientFormat() === 1, 'bootstrap keeps a compatible newer client unless another update condition applies');
 
   // 7. Live TV is optional: the option is stored and the key binds are refreshed
   let store = {}, ensured = 0;
