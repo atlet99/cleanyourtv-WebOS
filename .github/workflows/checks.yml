@@ -45,8 +45,8 @@ jobs:
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           "$RUNNER_TEMP/go-bin/actionlint" -color
           shellcheck .github/actions/package-webos/setup.sh
-      - name: Test release planning and publication guards
-        run: python3 tools/release-check.py
+      - name: Test SemVer integration and publication guards
+        run: '"$RUNNER_TEMP/python-ci/bin/python" tools/release-check.py'
       - name: Test the Homebrew Channel feed generator
         run: python3 tools/make-repo-feed.py --selftest
       - name: Test service, security and localisation on Node 8.12.0

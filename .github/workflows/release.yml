@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: write
+      pull-requests: read
     outputs:
       new_release_published: ${{ steps.publish.outputs.published }}
       new_release_version: ${{ steps.plan.outputs.version }}
@@ -31,11 +32,23 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-      - name: Plan version and release notes
+      - name: Resolve SemVer and notes from merged PR labels
+        id: semver
+        uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
+        with:
+          config-name: release-drafter.yml
+          commitish: ${{ github.sha }}
+          publish: false
+          dry-run: true
+          include-pre-releases: false
+      - name: Validate calculated release context
         id: plan
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 tools/release.py plan --plan "$RUNNER_TEMP/release-plan.json"
+          SEMVER_VERSION: ${{ steps.semver.outputs.resolved_version }}
+          SEMVER_TAG: ${{ steps.semver.outputs.tag_name }}
+          SEMVER_NOTES: ${{ steps.semver.outputs.body }}
+          SEMVER_LABELS: ${{ steps.semver.outputs.labels }}
+        run: python3 tools/release.py prepare --plan "$RUNNER_TEMP/release-plan.json"
       - name: Require both production signing keys
         if: steps.plan.outputs.publish == 'true'
         env:

@@ -37,6 +37,7 @@ nav = [
     { "Contributing" = "development/index.md" },
     { "Testing and CI" = "development/testing.md" },
     { "IPK builds in GitHub Actions" = "development/ci-builds.md" },
+    { "Versioning policy" = "development/versioning.md" },
     { "Localisation" = "development/localization.md" },
     { "Signed releases" = "development/signed-releases.md" },
     { "Internals" = "development/internals.md" },

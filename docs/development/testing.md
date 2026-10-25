@@ -39,7 +39,8 @@ go to a TV. The mock needs to answer `/api/apps`, `/api/live/*` and `/api/manage
 | Workflow | When | What |
 |---|---|---|
 | `ci.yml` / `checks.yml` | Pull requests to `main`, or called from Release | ESLint, Ruff, actionlint/ShellCheck, release tests, Node 8 suite, packaging tests and strict docs build; unsigned preview artifacts only |
-| `release.yml` | Push to `main`, or manual run on `main` | Requires checks, selects a semantic version, signs and verifies packages, uploads a draft and publishes it with its tag |
+| `semver.yml` | Pull requests to `main` | Requires exactly one `semver:*` impact label and validates the Release Drafter configuration and category match |
+| `release.yml` | Push to `main`, or manual run on `main` | Requires checks, resolves the version from merged PR labels (Release Drafter, dry-run), validates and signs packages, uploads a draft and publishes it with its tag |
 | `build-ipk.yml` | Manual run | Builds downloadable artifacts; can package another prepared app with the isolated plugin |
 | `localization.yml` | Relevant pushes and pull requests, or manual run | Checks localisation dictionaries and rendering on Node 8.12.0 without release secrets |
 | `docs.yml` | Called after successful Release, documentation PRs, manual run or stable release event | Builds the site and verified HBC feed together; PRs only validate |

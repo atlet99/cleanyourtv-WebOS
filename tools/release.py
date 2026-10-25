@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan and publish signed IPK releases. Planning is read-only; publishing is explicit."""
+"""Validate Release Drafter output and publish signed IPKs. Version calculation belongs to the Action."""
 import argparse
 import hashlib
 import json
@@ -7,13 +7,11 @@ import os
 from pathlib import Path
 import re
 import subprocess
-import sys
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)\Z')
-PREFIXES = ('app/', 'manager/', 'picker/', 'notify/', 'helper/', 'scripts/', 'shared/', 'themes/', 'third-party/', 'voice/', 'ipk/')
-FILES = {'compat.json', 'config.example.json', 'install.sh', 'uninstall.sh', 'LICENSE', 'THIRD-PARTY.md',
-         '.github/actions/package-webos/package.json', '.github/actions/package-webos/package-lock.json', '.github/actions/package-webos/setup.sh'}
+# LG appinfo.json accepts stable X.Y.Z only, with at most nine ASCII digits per component.
+VERSION = re.compile(r'(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\Z')
+LABELS = {'semver:major', 'semver:minor', 'semver:patch', 'semver:none'}
 
 
 def run(*args, root=ROOT, **kwargs):
@@ -25,27 +23,15 @@ def git(*args, root=ROOT):
 
 
 def version(value):
-    match = VERSION.fullmatch(value)
-    if not match:
-        raise ValueError('Invalid stable release version: ' + value)
-    return tuple(map(int, match.groups()))
+    if not isinstance(value, str) or not VERSION.fullmatch(value):
+        raise ValueError('Release version must be an LG-compatible stable X.Y.Z: ' + str(value))
 
 
-def bump(value, kind):
-    major, minor, patch = version(value)
-    return '.'.join(map(str, (major + 1, 0, 0) if kind == 'major' else (major, minor + 1, 0) if kind == 'minor' else (major, minor, patch + 1)))
-
-
-def releasable(name):
-    return name in FILES or (name.startswith(PREFIXES) and name != 'themes/README.md')
-
-
-def change_kind(subject, body=''):
-    if re.search(r'(^|\n)BREAKING[ -]CHANGE:', body) or re.match(r'\w+(?:\([^)]*\))?!:', subject) or subject.upper().startswith('[BREAKING]'):
-        return 'major'
-    if re.match(r'feat(?:\([^)]*\))?:', subject, re.I) or re.match(r'\[(FEATURE|ADD)\]', subject, re.I):
-        return 'minor'
-    return 'patch'
+def check_pr_labels(labels):
+    selected = [label for label in labels if label.startswith('semver:')]
+    if len(selected) != 1 or selected[0] not in LABELS:
+        raise ValueError('Apply exactly one PR label: ' + ', '.join(sorted(LABELS)))
+    return selected[0]
 
 
 def tag_commit(tag, root=ROOT):
@@ -57,56 +43,22 @@ def marker(sha):
     return '<!-- cleanyourtv-release:' + sha + ' -->'
 
 
-def plan(repo, releases, root=ROOT):
+def prepare(repo, resolved_version, tag, notes, labels, root=ROOT):
     if not re.fullmatch(r'[\w.-]+/[\w.-]+', repo):
         raise ValueError('Invalid GitHub repository')
     head = git('rev-parse', 'HEAD', root=root)
-    stable = [r for r in releases if not r['draft'] and not r['prerelease'] and r['tag_name'].startswith('v') and VERSION.fullmatch(r['tag_name'][1:])]
-    previous = max(stable, key=lambda r: version(r['tag_name'][1:])) if stable else None
-    base = previous['tag_name'] if previous else ''
-    if base:
-        if not tag_commit(base, root) or subprocess.run(['git', 'merge-base', '--is-ancestor', base, head], cwd=root).returncode:
-            raise ValueError('Latest published release is not an ancestor of this commit')
-        changed = git('diff', '--name-only', '-z', base, head, root=root).split('\0')
-    else:
-        changed = git('ls-files', '-z', root=root).split('\0')
-    if not any(releasable(name) for name in changed):
-        return {'publish': False, 'reason': 'No application or packaging changes since the latest release', 'source': head, 'repo': repo}
-    revisions = base + '..' + head if base else head
-    commits = []
-    for sha in git('rev-list', '--no-merges', revisions, root=root).splitlines():
-        paths = git('diff-tree', '--root', '--no-commit-id', '--name-only', '-r', '-z', sha, root=root).split('\0')
-        if any(releasable(name) for name in paths):
-            subject = git('show', '-s', '--format=%s', sha, root=root)
-            body = git('show', '-s', '--format=%b', sha, root=root)
-            commits.append((sha, subject, change_kind(subject, body)))
-    if not commits:
-        commits.append((head, git('show', '-s', '--format=%s', head, root=root), 'patch'))
-    kind = max((c[2] for c in commits), key={'patch': 0, 'minor': 1, 'major': 2}.get, default='patch')
-    source_version = re.search(r"const VERSION = '([^']+)'", (root / 'helper/helper.js').read_text()).group(1)
-    version(source_version)
-    next_version = max([bump(base[1:], kind), source_version], key=version) if base else source_version
-    aliases = [tag[1:] for tag in git('tag', '--points-at', head, '--list', 'v*', root=root).splitlines() if VERSION.fullmatch(tag[1:])]
-    next_version = max([next_version] + aliases, key=version)
-    drafts = {r['tag_name']: r for r in releases if r['draft']}
-    while True:
-        tag = 'v' + next_version
-        target = tag_commit(tag, root)
-        draft = drafts.get(tag)
-        if (target is None or target == head) and (not draft or marker(head) in (draft.get('body') or '')):
-            break
-        next_version = bump(next_version, 'patch')
-    lines = ['# ' + tag, '', 'Initial release of this fork.' if not base else 'Changes since ' + base + '.', '']
-    for label, level in [('Breaking changes', 'major'), ('Features', 'minor'), ('Fixes and other changes', 'patch')]:
-        selected = [c for c in commits[:100] if c[2] == level]
-        if selected:
-            lines += ['## ' + label, ''] + ['- ' + subject + ' ([' + sha[:7] + '](https://github.com/' + repo + '/commit/' + sha + '))' for sha, subject, _ in selected] + ['']
-    if len(commits) > 100:
-        lines += ['Additional commits are included in the comparison below.', '']
-    if base:
-        lines += ['[Full comparison](https://github.com/' + repo + '/compare/' + base + '...' + tag + ')', '']
-    lines += ['Build commit: `' + head + '`.', '', marker(head)]
-    return {'publish': True, 'version': next_version, 'tag': tag, 'source': head, 'base': base, 'repo': repo, 'notes': '\n'.join(lines) + '\n'}
+    if not isinstance(labels, list) or any(not isinstance(label, str) or label not in LABELS for label in labels):
+        raise ValueError('Unexpected Release Drafter label output')
+    if not (set(labels) - {'semver:none'}):
+        return {'publish': False, 'reason': 'No merged PRs marked for an application release', 'source': head, 'repo': repo}
+    version(resolved_version)
+    if tag != 'v' + resolved_version or not isinstance(notes, str) or not notes.strip():
+        raise ValueError('Release Drafter version, tag or notes are inconsistent')
+    target = tag_commit(tag, root)
+    if target not in (None, head):
+        raise ValueError('Calculated tag already belongs to another commit; refusing to move it')
+    notes = notes.rstrip() + '\n\nBuild commit: `' + head + '`.\n\n' + marker(head) + '\n'
+    return {'publish': True, 'version': resolved_version, 'tag': tag, 'source': head, 'repo': repo, 'notes': notes}
 
 
 def gh_json(*args):
@@ -190,13 +142,20 @@ def publish(data, public_key, root=ROOT):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['plan', 'publish'])
+    parser.add_argument('command', choices=['check-pr', 'prepare', 'publish'])
     parser.add_argument('--repo', default=os.environ.get('GITHUB_REPOSITORY', ''))
-    parser.add_argument('--plan', type=Path, required=True)
+    parser.add_argument('--plan', type=Path)
     parser.add_argument('--public-key', type=Path)
     args = parser.parse_args()
-    if args.command == 'plan':
-        data = plan(args.repo, releases(args.repo))
+    if args.command == 'check-pr':
+        event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+        print(check_pr_labels([label['name'] for label in event['pull_request']['labels']]))
+        return
+    if args.plan is None:
+        parser.error('--plan is required for prepare/publish')
+    if args.command == 'prepare':
+        data = prepare(args.repo, os.environ.get('SEMVER_VERSION', ''), os.environ.get('SEMVER_TAG', ''),
+                       os.environ.get('SEMVER_NOTES', ''), json.loads(os.environ.get('SEMVER_LABELS') or '[]'))
         args.plan.write_text(json.dumps(data))
         result = {'publish': str(data['publish']).lower(), 'version': data.get('version', ''), 'tag': data.get('tag', '')}
     else:
