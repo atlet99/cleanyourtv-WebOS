@@ -3,7 +3,12 @@
 // back to LG's own picker. Other binds in keybinds.json are left alone.
 const fs = require('fs'), cp = require('child_process'), nc = require('./netcompat');
 const D = '/media/developer/cleanyourtv', HOOK = D + '/inputhook', CFGDIR = '/home/root/.config/lginputhook', BINDS = CFGDIR + '/keybinds.json';
-const TARGETS = ['RELEASE', 'lginput2', 'micomservice', 'tvservice', 'testapp'];
+// The processes the hook goes into. LG's input service (lginput2) is where the remote's keys arrive on webOS 5 and newer, and the
+// only one hooked when it runs. The others are only for firmware without it: in micomservice the hook replaces write(), and that
+// process also passes the remote's keys on to HDMI-CEC devices and the soundbar; hooked there, CEC control and eARC stopped
+// working after a boot (upstream issue 23). Prefer lginput2 whenever it runs.
+const PRIMARY = 'lginput2', FALLBACK = ['RELEASE', 'micomservice', 'tvservice', 'testapp'];
+const TARGETS = [PRIMARY].concat(FALLBACK);
 const DEFAULT_KEY = '241', COMMAND = 'sh ' + D + '/inputkey.sh', VOICE_COMMAND = 'sh ' + D + '/voicekey.sh', GUIDE_COMMAND = 'sh ' + D + '/guidekey.sh';   // 241: the Input button on the remote this was written with; learned in the setup
 const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbin:' + (process.env.PATH || '') });
 
@@ -14,7 +19,8 @@ function procs() {
     if (!/^\d+$/.test(p)) continue;
     try { const n = fs.readFileSync('/proc/' + p + '/comm', 'utf8').trim(); if (TARGETS.includes(n)) out.push({ pid: p, name: n }); } catch (_) {}
   }
-  return out;
+  const primary = out.filter(x => x.name === PRIMARY);
+  return primary.length ? primary : out;
 }
 const hooked = pid => { try { return fs.readFileSync('/proc/' + pid + '/maps', 'utf8').includes('libinputhookpp'); } catch (_) { return false; } };
 
