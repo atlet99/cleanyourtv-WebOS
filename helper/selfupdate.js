@@ -7,7 +7,7 @@
 const fs = require('fs'), cp = require('child_process');
 const { fetch, cmp } = require('./manager');
 const signatures = require('./release');
-const D = '/media/developer/cleanyourtv', SVC = '/media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service';
+const D = '/media/developer/cleanyourtv', SVC = '/media/developer/apps/usr/palm/applications/com.cleanyourtv.manager/root';
 const DEFAULT_REPO = 'atlet99/cleanyourtv-WebOS';
 const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbin:' + (process.env.PATH || '') });
 const say = m => console.log(m);

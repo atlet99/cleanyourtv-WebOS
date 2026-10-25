@@ -38,8 +38,9 @@ https://atlet99.github.io/cleanyourtv-WebOS/repo/apps.json
 ```
 
 Then install **CleanYourTV** from the channel and choose **Set up now** on the first start. The feed serves the latest
-release at a permanent address, so channel updates arrive the same way. The channel checks the package's SHA-256 from
-the feed; the releases themselves are additionally signed and verified by the TV ([security](security.md)).
+release at a permanent address, so channel updates arrive the same way. The publisher verifies the signature and install
+metadata before updating the feed. Homebrew Channel checks SHA-256; the CleanYourTV manager verifies signatures for its
+own updates ([security](security.md)).
 
 ### 1. Install the manager app (over SSH)
 
@@ -78,13 +79,35 @@ Its log is `/media/developer/cleanyourtv/run/setup.log`, kept across the restart
 
 ??? note "The same setup over SSH"
     ```sh
-    sh /media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service/bootstrap.sh install
+    sh /media/developer/apps/usr/palm/applications/com.cleanyourtv.manager/root/bootstrap.sh install
     ```
     Options: `--no-debloat`, `--no-input-key`, `--no-start`, `--no-verify`, `--force`.
 
+## Transition from 1.6.2 and earlier
+
+Older IPKs incorrectly listed the boot-launched root daemon as a Luna service without `services.json`. LG's installer
+can reject them with `-5: Service id should start with app id`. The corrected package stores the daemon under the
+manager application's `root/` resources, with no Luna service declaration. Update the HBC feed and install the new release;
+the already-published 1.6.2 package is not replaced in place.
+
+For a fresh installation, open CleanYourTV and choose **Set up now** as usual. On a TV already configured with an older release,
+install the new IPK via HBC and run the following **once over SSH as root** to copy the new files and refresh cached launcher pages:
+
+```sh
+P=/media/developer/apps/usr/palm/applications/com.cleanyourtv.manager/root
+V=$(sed -n "s/^const VERSION = '\(.*\)';/\1/p" "$P/helper/helper.js")
+test -n "$V" && sh "$P/bootstrap.sh" update "$V"
+```
+
+The updated SSH installer performs this handoff automatically. An updater process from 1.6.2 or earlier still holds the old
+path in memory and cannot perform that first handoff itself. The working directory, configuration, API token, learned keys
+and boot hooks remain under `/media/developer/cleanyourtv`; do not delete it or uninstall to perform this transition.
+Reopen the manager after completion. Future updates use the new path normally.
+Old saved launcher pages that reference the removed directory are not offered for rollback; new compatible versions are retained normally.
+
 ## Unlisted firmware
 
-The setup matches the TV's firmware against [`compat.json`](https://github.com/lasharor/cleanyourtv-WebOS/blob/main/compat.json)
+The setup matches the TV's firmware against [`compat.json`](https://github.com/atlet99/cleanyourtv-WebOS/blob/main/compat.json)
 (it fetches the newest copy from the update source and falls back to the one in the package). A listed firmware is set up directly.
 For an unlisted firmware the setup continues when LG's Home app is the flutter or web kind, and otherwise stops and offers
 **Set up anyway**. To add a firmware to the list, open an issue with the output of **Share log** ([Troubleshooting](troubleshooting.md)).

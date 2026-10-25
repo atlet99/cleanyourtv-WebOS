@@ -1,5 +1,5 @@
 #!/bin/sh
-# CleanYourTV service bootstrap. Runs as root on the TV, from the service folder of the installed package:
+# CleanYourTV service bootstrap. Runs as root on the TV, from the manager app's root/ payload directory:
 #   sh bootstrap.sh install [--no-debloat] [--no-input-key] [--no-start] [--no-verify] [--force]
 #   sh bootstrap.sh update <version>      after the manager installed a newer package (restarts the service, undoes it if it fails)
 # It copies the service files to /media/developer/cleanyourtv, installs the boot scripts, replaces LG's Home and
@@ -135,9 +135,9 @@ mkdir -p $D/live; chmod 700 $D/live 2>/dev/null; chmod 600 $D/config.json $D/usa
 [ -f $D/config.json ] || cp $S/config.example.json $D/config.json
 [ -f $D/compat.json ] || cp $S/compat.json $D/compat.json
 
-# the launcher that ships with the package, unless a newer one is already installed
+# Keep a newer cached launcher only if its API bootstrap format is compatible with this package.
 newer() { $J newer "$1" "$2"; }
-if [ ! -f $D/app/index.html ] || newer $S/payload/app/version.json $D/app/version.json || { [ -f $S/payload/app/BUILD ] && ! cmp -s $S/payload/app/BUILD $D/app/BUILD; }; then
+if [ ! -f $D/app/index.html ] || $J api-mismatch "$S/payload/app/version.json" "$D/app/version.json" || newer $S/payload/app/version.json $D/app/version.json || { [ -f $S/payload/app/BUILD ] && ! cmp -s $S/payload/app/BUILD $D/app/BUILD; }; then
   rm -rf $D/app.prev; [ -d $D/app ] && mv $D/app $D/app.prev
   mkdir -p $D/app && cp $S/payload/app/* $D/app/
   say "launcher $(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' $D/app/version.json) in place"

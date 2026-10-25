@@ -13,7 +13,7 @@ uninstall. Optional features contact other services only when you switch them on
 |---|---|
 | `/media/developer/cleanyourtv/` | The service (`helper.js` and modules), the launcher (`app/`), scripts, `config.json`, `usage.json`, the backup of the original state in `backup/`, Live TV data in `live/`, the optional voice download in `voice/` |
 | `/media/developer/apps/usr/palm/applications/` | The apps `com.cleanyourtv.manager`, `.picker` and `.notify` |
-| `/media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service/` | The installed package contents |
+| `/media/developer/apps/usr/palm/applications/com.cleanyourtv.manager/root/` | Installed bootstrap, helper code and root-daemon assets; not a Luna service |
 | `/var/lib/webosbrew/init.d/` | Boot scripts `10-cleanyourtv-home` and, with debloat on, `15-cleanyourtv-debloat` (links into the folder above) |
 | `/home/root/.config/lginputhook/keybinds.json` | Our binds for the Input key (and the voice key); other binds are left alone |
 | `/media/developer/cleanyourtv/run/setup.log` | The setup log (root-only runtime directory) |

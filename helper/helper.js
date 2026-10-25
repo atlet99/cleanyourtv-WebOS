@@ -1,8 +1,8 @@
 // Root service of CleanYourTV: bridges the launcher web app to luna, serves app icons, runs Live TV and picture
-// notifications, keeps the Input-key picker alive and hosts the manager API. Listens on 127.0.0.1 only.
+// notifications, closes the on-demand Inputs picker and hosts the manager API. Listens on 127.0.0.1 only.
 const http = require('http'), fs = require('fs'), path = require('path'), cp = require('child_process');
 const VERSION = '1.5.13';
-const PORT = 8765, DIR = '/media/developer/cleanyourtv', CONF = DIR + '/config.json', USAGE = DIR + '/usage.json';
+const PORT = Number(process.env.CYTV_PORT) || 8765, DIR = process.env.CYTV_DIR || '/media/developer/cleanyourtv', CONF = DIR + '/config.json', USAGE = DIR + '/usage.json';   // the environment variables are for tools/node8-check.js
 const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbin:' + (process.env.PATH || '') });
 const security = require('./security'), apiToken = security.token();
 

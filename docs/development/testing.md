@@ -42,7 +42,7 @@ go to a TV. The mock needs to answer `/api/apps`, `/api/live/*` and `/api/manage
 | `release.yml` | Push to `main`, or manual run on `main` | Requires checks, selects a semantic version, signs and verifies packages, uploads a draft and publishes it with its tag |
 | `build-ipk.yml` | Manual run | Builds downloadable artifacts; can package another prepared app with the isolated plugin |
 | `localization.yml` | Relevant pushes and pull requests, or manual run | Checks localisation dictionaries and rendering on Node 8.12.0 without release secrets |
-| `docs.yml` | Pushes that touch the documentation | Builds this site; deploys it to GitHub Pages from `main` |
+| `docs.yml` | Called after successful Release, documentation PRs, manual run or stable release event | Builds the site and verified HBC feed together; PRs only validate |
 
 Explicitly published signed test prereleases can appear in the manager app's **Update channel** list; CI previews are artifacts only.
 See [Test builds](../managing.md#test-builds).

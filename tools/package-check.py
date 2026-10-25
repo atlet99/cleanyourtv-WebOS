@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build with a temporary test key; inspect signatures and bundled pages. No TV is contacted."""
 import io
+import base64
 import hashlib
 import json
 import os
@@ -8,6 +9,7 @@ from pathlib import Path
 import subprocess
 import tarfile
 import tempfile
+from ipk_metadata import validate_manager_ipk
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -22,6 +24,13 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
     run('openssl', 'genrsa', '-out', str(private), '2048', stderr=subprocess.DEVNULL)
     run('openssl', 'rsa', '-in', str(private), '-pubout', '-out', str(public), stderr=subprocess.DEVNULL)
     try:
+        # The old producer accidentally registered a boot payload as a Luna service; reject it before writing an IPK.
+        old = {'metadata': {'id': 'com.cleanyourtv.manager', 'version': '1.0.0'}, 'files': [
+            {'path': 'usr/palm/applications/com.cleanyourtv.manager/appinfo.json', 'data': base64.b64encode(b'{}').decode(), 'mode': 0o644},
+            {'path': 'usr/palm/services/com.cleanyourtv.manager.service/helper.js', 'data': '', 'mode': 0o644},
+        ]}
+        rejected = subprocess.run(['node', 'ipk/pack.cjs'], cwd=ROOT, input=json.dumps(old), capture_output=True, text=True)
+        assert rejected.returncode != 0 and 'requires services.json' in rejected.stderr and not rejected.stdout
         env = dict(os.environ, CYTV_SIGNING_KEY=str(private), CYTV_RELEASE_PUBLIC_KEY=str(public), CYTV_RELEASE_VERSION='9.8.7')
         run('python3', 'ipk/build.py', env=env)
         assets = list((ROOT / 'dist').glob('*.ipk')) + list((ROOT / 'dist').glob('frontend-*.tgz'))
@@ -29,6 +38,7 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
         for asset in assets:
             run('openssl', 'dgst', '-sha256', '-verify', str(public), '-signature', str(asset) + '.sha256.sig', str(asset) + '.sha256')
             if asset.suffix == '.ipk':
+                assert validate_manager_ipk(asset)['version'] == '9.8.7'
                 data = asset.read_bytes()
                 assert data[:8] == b'!<arch>\n'
                 offset = 8
@@ -61,7 +71,7 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
                     assert 'Телеканалы'.encode() in html
                 if asset.suffix == '.ipk':
                     assert all(m.mtime == 1761000000 and m.uid == 0 and m.gid == 0 for m in archive.getmembers())
-                    service = 'usr/palm/services/com.cleanyourtv.manager.service/'
+                    service = 'usr/palm/applications/com.cleanyourtv.manager/root/'
                     key = archive.extractfile(members[service + 'helper/release-public.pem']).read()
                     assert key == public.read_bytes()
                     assert not any('private.pem' in m.name for m in archive.getmembers())
@@ -72,13 +82,22 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
                         assert members[service + executable].mode == 0o755
                     assert members[service + 'inputhook/libinputhookpp.so'].mode == 0o644
                     package = json.load(archive.extractfile(members['usr/palm/packages/com.cleanyourtv.manager/packageinfo.json']))
-                    assert package['app'] == 'com.cleanyourtv.manager' and package['services'] == ['com.cleanyourtv.manager.service']
+                    assert package['app'] == 'com.cleanyourtv.manager' and package['services'] == []
+                    assert not any(name.startswith('usr/palm/services/') for name in members)
+                    for page in pages:
+                        html = archive.extractfile(page).read()
+                        assert b'/applications/com.cleanyourtv.manager/root/helper/security.js token' in html
+                        assert b'/services/com.cleanyourtv.manager.service' not in html
+                    for module in ['manager.js', 'selfupdate.js', 'sharelog.js', 'voice.js']:
+                        body = archive.extractfile(members[service + 'helper/' + module]).read()
+                        assert b'/applications/com.cleanyourtv.manager/root' in body
+                        assert b'/services/com.cleanyourtv.manager.service' not in body
                     picker_info = json.load(archive.extractfile(members['usr/palm/applications/com.cleanyourtv.picker/appinfo.json']))
                     assert picker_info['handlesRelaunch'] is True and picker_info['defaultWindowType'] == 'overlay'
                     assert package['version'] == '9.8.7'
                     assert b"const VERSION = '9.8.7'" in archive.extractfile(members[service + 'helper/helper.js']).read()
                     frontend = json.load(archive.extractfile(members[service + 'payload/app/version.json']))
-                    assert frontend['version'] == frontend['minService'] == '9.8.7'
+                    assert frontend['version'] == frontend['minService'] == '9.8.7' and frontend['apiVersion'] == 3
                     html = archive.extractfile(members[service + 'payload/app/index.html']).read()
                     assert b"VERSION='9.8.7'" in html and b"MIN_SERVICE='9.8.7'" in html
                     for app in ['manager', 'picker', 'notify']:
@@ -86,14 +105,24 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
                     assert not any('node_modules/' in m.name for m in archive.getmembers())
                 else:
                     frontend = json.load(archive.extractfile(members['app/version.json']))
-                    assert frontend['version'] == frontend['minService'] == '9.8.7'
+                    assert frontend['version'] == frontend['minService'] == '9.8.7' and frontend['apiVersion'] == 3
                     launcher = archive.extractfile(members['app/index.html']).read()
                     assert b"v.addEventListener('error',onError,true)" in launcher
                     assert b".test(url))return [{src:url,type:''},{src:url,type:'application/x-mpegURL'}" in launcher
+        # Exercise the actual Pages command on the signed IPK, not just the feed's small offline fixtures.
+        site = Path(temp) / 'pages'
+        site.mkdir()
+        (site / 'index.html').write_text('existing documentation')
+        run('python3', 'tools/make-repo-feed.py', 'build', '--dist', 'dist', '--out', str(site / 'repo'),
+            '--base-url', 'https://example.github.io/project/repo', '--root', 'https://example.github.io/project', '--public-key', str(public))
+        feed = json.loads((site / 'repo/apps.json').read_text())
+        assert feed['packages'][0]['manifest']['version'] == '9.8.7'
+        assert (site / 'repo/com.cleanyourtv.manager_9.8.7_all.ipk').read_bytes() == (ROOT / 'dist/com.cleanyourtv.manager_9.8.7_all.ipk').read_bytes()
+        assert (site / 'index.html').read_text() == 'existing documentation'
         checksums = {a.name: hashlib.sha256(a.read_bytes()).digest() for a in assets}
         run('python3', 'ipk/build.py', env=env)
         assert all(hashlib.sha256((ROOT / 'dist' / name).read_bytes()).digest() == value for name, value in checksums.items())
-        print('ok   standalone 2.2.0 multi-app IPK: signatures, explicit modes/mtime, reproducibility, offline UI and public key')
+        print('ok   standalone 2.2.0: install metadata, app-owned root payload, paths, signatures, modes/mtime and reproducibility')
     finally:
         # Leave ordinary dev output, never a release signed by an ephemeral test identity.
         env = dict(os.environ)

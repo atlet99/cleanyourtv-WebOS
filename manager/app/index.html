@@ -37,7 +37,7 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:var(--night);col
   <div id="sharemsg"></div><div id="shareurl"></div><div id="shareclose">Close</div>
   <div id="qrbox"><canvas id="qr"></canvas></div></div>
 <script>
-var kFlow='input', kText='', kRows=[], kTimer=0, upd=null, checkedOffline=false, forceOffer=false, API='http://127.0.0.1:8765', SVC='/media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service';
+var kFlow='input', kText='', kRows=[], kTimer=0, upd=null, checkedOffline=false, forceOffer=false, API='http://127.0.0.1:8765', SVC='/media/developer/apps/usr/palm/applications/com.cleanyourtv.manager/root';
 var napi=null, lv=null, th=null, vo=null, mdl=[], agl=[], tst=null, shareMode='log', pairBase=0,  idxStack=[], setupIdx=0, updIdx=0, st=null, rows=[], idx=0, view='main', pending=null, pollT=0, setup={debloat:true,inputKey:true}, offline=false, busyMsg='';
 function $(i){return document.getElementById(i)}
 function t(s){return CYTV_I18N.t(s)}
@@ -405,7 +405,7 @@ function kLearn(name){
     (function poll(){kTimer=setTimeout(function(){api('/api/manager/learn-state').then(function(l){
       if(view!=='keys')return;
       if(l.state==='got'){kShow(kName(name)+' key learned: code '+l.code+'.',[{label:name==='input'?'Continue to the test':'Close',fn:function(){api('/api/manager/status').then(function(s){st=s;if(name==='input')kStep('test');else closeKeys()})}}]);return}
-      if(l.state==='unsupported'){api('/api/manager/options',{inputKey:false});kShow('The hook did not attach on this firmware, so keys cannot be learned. The Input key stays with LG\u2019s picker.\nUse Share log to report this.',[{label:'Close',fn:closeKeys}]);return}
+      if(l.state==='unsupported'){kShow('The hook did not attach on this firmware, so keys cannot be learned. The Input key stays with LG\u2019s picker.\nUse Share log to report this.',[{label:'Close',fn:closeKeys}]);return}
       if(l.state==='timeout'){kShow('Nothing was pressed.',[{label:'Try again',fn:function(){kLearn(name)}},{label:name==='input'?'Skip':'Close',fn:function(){if(name==='input')kStep('test');else closeKeys()}}]);return}
       poll()},function(){poll()})},500)})()})}
 function kTest(){

@@ -65,7 +65,7 @@ See [Testing and CI](testing.md).
 ## Documentation site
 
 GitHub Pages publishes this documentation at <https://atlet99.github.io/cleanyourtv-WebOS/>.
-Changes to `docs/`, `zensical.toml` or the documentation workflow on `main` rebuild and deploy the site.
+The Release workflow calls Documentation after successful main checks, rebuilding the site and verified `/repo/` feed together.
 Pull requests only build it for validation. To publish manually, open **Actions → Documentation → Run workflow** on `main`.
 The Pages source in **Settings → Pages** is **GitHub Actions**; no separate publishing branch is needed.
 

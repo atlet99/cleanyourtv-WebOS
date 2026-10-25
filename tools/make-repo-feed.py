@@ -5,17 +5,21 @@ The feed is the format the Homebrew Channel parses for custom repositories (apps
 manifest, the IPK, its SHA-256 and an icon), published on GitHub Pages under /repo/ so users can add
 one URL to the TV and install/update from there. `--selftest` validates the generator offline.
 
-Usage: make-repo-feed.py build --dist DIR --out DIR --base-url URL --source URL
+Usage: make-repo-feed.py build --dist DIR --out DIR --base-url URL --public-key FILE --source URL
        make-repo-feed.py --selftest
 """
 import argparse
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
+import tarfile
 import tempfile
+from ipk_metadata import validate_manager_ipk
 
 PACKAGE = 'com.cleanyourtv.manager'
 NAME = 'CleanYourTV'
@@ -32,7 +36,7 @@ def sha256(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def build(dist, out, base_url, source, icon, root='https://atlet99.github.io/cleanyourtv-WebOS'):
+def build(dist, out, base_url, source, icon, root='https://atlet99.github.io/cleanyourtv-WebOS', public_key=None):
     dist, out = Path(dist), Path(out)
     ipks = sorted(dist.glob(PACKAGE + '_*_all.ipk'))
     if len(ipks) != 1:
@@ -45,10 +49,24 @@ def build(dist, out, base_url, source, icon, root='https://atlet99.github.io/cle
     data = ipk.read_bytes()
     digest = sha256(data)
     checksum_file = Path(str(ipk) + '.sha256')
-    if checksum_file.exists():
-        expected = digest + '  ' + ipk.name + '\n'
-        if checksum_file.read_text() != expected:
-            raise SystemExit('the .sha256 file does not match the package: ' + checksum_file.name)
+    if not checksum_file.is_file():
+        raise SystemExit('missing .sha256 file: ' + checksum_file.name)
+    expected = digest + '  ' + ipk.name + '\n'
+    if checksum_file.read_text() != expected:
+        raise SystemExit('the .sha256 file does not match the package: ' + checksum_file.name)
+    signature_file = Path(str(checksum_file) + '.sig')
+    if public_key is None or not signature_file.is_file():
+        raise SystemExit('a trusted public key and .sha256.sig are required for the feed')
+    try:
+        subprocess.run(['openssl', 'dgst', '-sha256', '-verify', str(public_key), '-signature', str(signature_file), str(checksum_file)], check=True, capture_output=True)
+    except subprocess.CalledProcessError as error:
+        raise SystemExit('release signature verification failed') from error
+    try:
+        metadata = validate_manager_ipk(ipk)
+    except (ValueError, OSError, tarfile.TarError) as error:
+        raise SystemExit('invalid install metadata: ' + str(error)) from error
+    if metadata['version'] != version:
+        raise SystemExit('package filename and metadata versions do not match')
     base = base_url.rstrip('/')
     icon_url = base + '/icon.png'
     ipk_url = base + '/' + ipk.name
@@ -70,6 +88,7 @@ def build(dist, out, base_url, source, icon, root='https://atlet99.github.io/cle
     out.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ipk, out / ipk.name)
     (out / (ipk.name + '.sha256')).write_text(digest + '  ' + ipk.name + '\n')
+    shutil.copyfile(signature_file, out / signature_file.name)
     (out / (PACKAGE + '.manifest.json')).write_text(json.dumps(manifest, indent=2) + '\n')
     (out / 'apps.json').write_text(json.dumps(feed, indent=2) + '\n')
     (out / 'SHA256SUMS').write_text(digest + '  ' + ipk.name + '\n')
@@ -90,7 +109,8 @@ def build(dist, out, base_url, source, icon, root='https://atlet99.github.io/cle
         'tap <b>+</b> and add this URL:</p>'
         '<p><code>' + base + '/apps.json</code></p>'
         '<p>Then install or update <b>' + NAME + '</b> from the channel. The package hash below is checked on install; '
-        'releases are also signed and verified by the TV itself.</p>'
+        'the publisher verifies the release signature before publishing this feed. Homebrew Channel checks the hash; '
+        'the CleanYourTV manager also verifies signatures for its own updates.</p>'
         '<p>SHA-256: <code>' + digest + '</code></p>'
         '<p><a href="' + ipk.name + '">Download ' + ipk.name + '</a> \u00b7 '
         '<a href="' + root + '/install/">Installation guide</a> \u00b7 '
@@ -101,16 +121,44 @@ def build(dist, out, base_url, source, icon, root='https://atlet99.github.io/cle
 def selftest():
     with tempfile.TemporaryDirectory(prefix='cytv-feed-') as directory:
         root = Path(directory)
-        payload = b'<!doctype html><p>fixture package</p>' * 100
         version = '9.9.9'
         name = PACKAGE + '_' + version + '_all.ipk'
         dist, out = root / 'dist', root / 'site' / 'repo'
         dist.mkdir(parents=True)
+        out.parent.mkdir()
+        (out.parent / 'index.html').write_text('existing documentation home')
+        # A small independent IPK fixture: production IPKs still use the standalone packager, never this test writer.
+        def fixture(services=()):
+            entries = {
+                'usr/palm/applications/' + PACKAGE + '/appinfo.json': json.dumps({'id': PACKAGE, 'version': version, 'title': NAME, 'type': 'web', 'main': 'index.html', 'icon': 'icon.png'}),
+                'usr/palm/applications/' + PACKAGE + '/index.html': '<!doctype html>',
+                'usr/palm/applications/' + PACKAGE + '/icon.png': 'fixture icon',
+                'usr/palm/packages/' + PACKAGE + '/packageinfo.json': json.dumps({'id': PACKAGE, 'app': PACKAGE, 'version': version, 'services': list(services)}),
+            }
+            for required in ['bootstrap.sh', 'helper/helper.js', 'helper/security.js']:
+                entries['usr/palm/applications/' + PACKAGE + '/root/' + required] = 'fixture'
+            buffer = io.BytesIO()
+            with tarfile.open(fileobj=buffer, mode='w:gz') as archive:
+                for path, text in entries.items():
+                    body = text.encode()
+                    member = tarfile.TarInfo(path); member.size = len(body)
+                    archive.addfile(member, io.BytesIO(body))
+            result = b'!<arch>\n'
+            for path, body in [('debian-binary', b'2.0\n'), ('data.tar.gz', buffer.getvalue())]:
+                result += ('%-16s%-12d%-6d%-6d%-8s%-10d`\n' % (path + '/', 0, 0, 0, '100644', len(body))).encode() + body + (b'\n' if len(body) % 2 else b'')
+            return result
+        payload = fixture()
         (dist / name).write_bytes(payload)
         (dist / (name + '.sha256')).write_text(sha256(payload) + '  ' + name + '\n')
+        private, public = root / 'private.pem', root / 'public.pem'
+        subprocess.run(['openssl', 'genrsa', '-out', str(private), '2048'], check=True, capture_output=True)
+        subprocess.run(['openssl', 'rsa', '-in', str(private), '-pubout', '-out', str(public)], check=True, capture_output=True)
+        def sign():
+            subprocess.run(['openssl', 'dgst', '-sha256', '-sign', str(private), '-out', str(dist / (name + '.sha256.sig')), str(dist / (name + '.sha256'))], check=True)
+        sign()
         icon = root / 'icon.png'
         icon.write_bytes(b'\x89PNG\r\n\x1a\nfixture-icon')
-        info = build(dist, out, 'https://example.github.io/cleanyourtv-WebOS/repo', 'https://github.com/example/cleanyourtv', icon, 'https://example.github.io/cleanyourtv-WebOS')
+        info = build(dist, out, 'https://example.github.io/cleanyourtv-WebOS/repo', 'https://github.com/example/cleanyourtv', icon, 'https://example.github.io/cleanyourtv-WebOS', public_key=public)
         assert info == {'version': version, 'sha256': sha256(payload), 'ipk': name, 'out': str(out)}
         feed = json.loads((out / 'apps.json').read_text())
         package = feed['packages'][0]
@@ -124,23 +172,49 @@ def selftest():
         assert (out / '.nojekyll').exists() and (out / 'icon.png').read_bytes() == icon.read_bytes()
         page = (out / 'index.html').read_text()
         assert 'https://example.github.io/cleanyourtv-WebOS/repo/apps.json' in page and version in page
+        assert (out.parent / 'index.html').read_text() == 'existing documentation home'
         # a package whose checksum file lies must be refused
         (dist / (name + '.sha256')).write_text('0' * 64 + '  ' + name + '\n')
         out2 = root / 'site2' / 'repo'
         try:
-            build(dist, out2, 'https://example.github.io/x', 'https://github.com/example/x', icon)
+            build(dist, out2, 'https://example.github.io/x', 'https://github.com/example/x', icon, public_key=public)
             raise AssertionError('a mismatching checksum file was accepted')
         except SystemExit as error:
             assert 'does not match' in str(error)
         # two packages at once are ambiguous and refused
         (dist / (name + '.sha256')).write_text(sha256(payload) + '  ' + name + '\n')
+        # Reproduce the old package: a root payload was incorrectly declared as a Luna service.
+        bad = fixture([PACKAGE + '.service'])
+        (dist / name).write_bytes(bad)
+        (dist / (name + '.sha256')).write_text(sha256(bad) + '  ' + name + '\n')
+        sign()
+        try:
+            build(dist, out2, 'https://example.github.io/x', 'https://github.com/example/x', icon, public_key=public)
+            raise AssertionError('the old invalid service declaration was accepted')
+        except SystemExit as error:
+            assert 'declares Luna services' in str(error)
+        assert not out2.exists(), 'bad metadata must not replace an existing site/feed'
+        (dist / name).write_bytes(payload)
+        (dist / (name + '.sha256')).write_text(sha256(payload) + '  ' + name + '\n')
+        (dist / (name + '.sha256.sig')).write_bytes(b'bad signature')
+        try:
+            build(dist, out2, 'https://example.github.io/x', 'https://github.com/example/x', icon, public_key=public)
+            raise AssertionError('an invalid release signature was accepted')
+        except SystemExit as error:
+            assert 'signature verification failed' in str(error)
+        (dist / (name + '.sha256')).unlink()
+        try:
+            build(dist, out2, 'https://example.github.io/x', 'https://github.com/example/x', icon, public_key=public)
+            raise AssertionError('a missing checksum file was accepted')
+        except SystemExit as error:
+            assert 'missing .sha256' in str(error)
         shutil.copyfile(dist / name, dist / (PACKAGE + '_9.9.8_all.ipk'))
         try:
-            build(dist, out2, 'https://example.github.io/x', 'https://github.com/example/x', icon)
+            build(dist, out2, 'https://example.github.io/x', 'https://github.com/example/x', icon, public_key=public)
             raise AssertionError('an ambiguous dist directory was accepted')
         except SystemExit as error:
             assert 'exactly one' in str(error)
-    print('ok   repository feed: manifest/hash/size, checksum verification, landing page and refusal of bad input')
+    print('ok   repository feed: signatures, install metadata, manifest/hash/size and rejection of the old service layout')
 
 
 def main():
@@ -150,6 +224,7 @@ def main():
     parser.add_argument('--dist', type=Path)
     parser.add_argument('--out', type=Path)
     parser.add_argument('--base-url')
+    parser.add_argument('--public-key', type=Path)
     parser.add_argument('--source', default='https://github.com/atlet99/cleanyourtv-WebOS')
     parser.add_argument('--icon', type=Path, default=Path(__file__).resolve().parent.parent / 'manager' / 'app' / 'icon.png')
     parser.add_argument('--root', default='https://atlet99.github.io/cleanyourtv-WebOS')
@@ -157,9 +232,9 @@ def main():
     if args.selftest:
         selftest()
         return
-    if args.command != 'build' or not (args.dist and args.out and args.base_url):
-        parser.error('use --selftest, or build --dist DIR --out DIR --base-url URL')
-    result = build(args.dist, args.out, args.base_url, args.source, args.icon, args.root)
+    if args.command != 'build' or not (args.dist and args.out and args.base_url and args.public_key):
+        parser.error('use --selftest, or build --dist DIR --out DIR --base-url URL --public-key FILE')
+    result = build(args.dist, args.out, args.base_url, args.source, args.icon, args.root, public_key=args.public_key)
     print('repository feed: %s %s (%s) in %s' % (NAME, result['version'], result['sha256'][:12], result['out']))
 
 

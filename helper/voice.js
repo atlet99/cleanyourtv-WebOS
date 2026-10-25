@@ -6,7 +6,7 @@
 const fs = require('fs'), path = require('path'), cp = require('child_process'), crypto = require('crypto'), https = require('https'), http = require('http'), zlib = require('zlib'), net = require('net');
 const nc = require('./netcompat'), { URL, URLSearchParams } = nc;
 const D = '/media/developer/cleanyourtv', V = D + '/voice', LIB = V + '/lib', MODEL = V + '/model', TMP = V + '/tmp';
-const SERVICE_DIR = '/media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service';
+const SERVICE_DIR = '/media/developer/apps/usr/palm/applications/com.cleanyourtv.manager/root';
 const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbin:' + (process.env.PATH || '') });
 const SOCKET = '/tmp/voiceinput_remote1.soc', RATE = 16000;
 

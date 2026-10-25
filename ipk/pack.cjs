@@ -15,7 +15,14 @@ async function pack() {
     if (Object.prototype.hasOwnProperty.call(namespace.assets, match[3])) throw new Error('Duplicate package path: ' + file.path);
     namespace.assets[match[3]] = { data: Buffer.from(file.data, 'base64'), mode: file.mode };
   }
-  for (const { id, type, assets } of namespaces.values()) builder.addEntries({ id, type }, assets);
+  for (const { id, type, assets } of namespaces.values()) {
+    if (type === 'service') {
+      if (!assets['services.json']) throw new Error('Luna service ' + id + ' requires services.json; put boot-daemon payloads in app resources');
+      const descriptor = JSON.parse(assets['services.json'].data.toString('utf8'));
+      if (descriptor.id !== id || !id.startsWith((metadata.primaryApp || metadata.id) + '.')) throw new Error('Service metadata must match its directory and start with the primary app id');
+    }
+    builder.addEntries({ id, type }, assets);
+  }
   process.stdout.write(await builder.buffer());
 }
 pack().catch(error => { console.error(error.message); process.exitCode = 1; });

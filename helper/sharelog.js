@@ -4,7 +4,7 @@
 // be running, so it also works when the setup failed. Addresses, MAC addresses and URL paths are masked in the report.
 // Writes run/sharelog.json {url, until}. Usage: node sharelog.js
 const http = require('http'), fs = require('fs'), os = require('os'), cp = require('child_process'), crypto = require('crypto');
-const D = '/media/developer/cleanyourtv', SVC = '/media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service';
+const D = '/media/developer/cleanyourtv', SVC = '/media/developer/apps/usr/palm/applications/com.cleanyourtv.manager/root';
 const R = D + '/run', SETUPLOG = R + '/setup.log';
 const STATE = R + '/sharelog.json', PIDF = R + '/sharelog.pid', LIFE = 10 * 60 * 1000;
 const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbin:' + (process.env.PATH || '') });

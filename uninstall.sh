@@ -26,7 +26,7 @@ for id in com.cleanyourtv.picker com.cleanyourtv.notify com.cleanyourtv.live com
   luna-send -n 1 -w 20000 -f luna://com.webos.appInstallService/dev/remove "{\"id\":\"$id\",\"subscribe\":false}" </dev/null >/dev/null 2>&1
   rm -rf /media/developer/apps/usr/palm/packages/$id /media/developer/apps/usr/palm/applications/$id
 done
-rm -rf /media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service
+rm -rf /media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service   # legacy payload from releases <= 1.6.2
 rm -rf $D
 [ $KEEP = 1 ] && { mkdir -p $D; mv /media/developer/cytv-keep/* $D/ 2>/dev/null; rmdir /media/developer/cytv-keep; }
 echo "[cleanyourtv] removed. Restarting the TV so that LG's Home and services come back."

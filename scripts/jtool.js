@@ -22,6 +22,8 @@ if (cmd === 'kind') {                       // kind <appinfo.json>  ->  "<id> <t
   var x = v(a[1]), y = v(a[2]), r = 1;
   for (var i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) { r = (x[i] || 0) > (y[i] || 0) ? 0 : 1; break; } }
   process.exit(r);
+} else if (cmd === 'api-mismatch') {        // api-mismatch <shipped version.json> <cached version.json> -> exit 0 when the client bootstrap format differs
+  process.exit(rj(a[1], {}).apiVersion !== rj(a[2], {}).apiVersion ? 0 : 1);
 } else if (cmd === 'options') {             // options <config.json> <debloat 1|0|''> <inputKey 1|0|''>
   var c = rj(a[1], {}), op = c.options = c.options || {};
   if (op.debloat === undefined) op.debloat = true;
@@ -47,4 +49,4 @@ if (cmd === 'kind') {                       // kind <appinfo.json>  ->  "<id> <t
 } else if (cmd === 'rmbind') {              // rmbind  ->  drop our Input-key bind from the inputhook's keybinds.json
   var p = '/home/root/.config/lginputhook/keybinds.json', b = rj(p, null);
   if (b) { Object.keys(b).forEach(function (k) { if (b[k] && String(b[k].command || '').indexOf('cleanyourtv') >= 0) delete b[k]; }); fs.writeFileSync(p, JSON.stringify(b)); }
-} else { console.error('usage: jtool.js kind|compat|newer|options|opt|stage|wintype|rmbind'); process.exit(2); }
+} else { console.error('usage: jtool.js kind|compat|newer|api-mismatch|options|opt|stage|wintype|rmbind'); process.exit(2); }
