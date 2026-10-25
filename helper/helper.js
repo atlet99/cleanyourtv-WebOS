@@ -5,11 +5,13 @@ const VERSION = '1.5.13';
 const PORT = Number(process.env.CYTV_PORT) || 8765, DIR = process.env.CYTV_DIR || '/media/developer/cleanyourtv', CONF = DIR + '/config.json', USAGE = DIR + '/usage.json';   // the environment variables are for tools/node8-check.js
 const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbin:' + (process.env.PATH || '') });
 const security = require('./security'), apiToken = security.token();
+const nc = require('./netcompat');
+process.on('unhandledRejection', e => console.error('unhandled: ' + ((e && e.stack) || e)));   // Node 15+ ends the service otherwise; a warning on Node 8
 
 function luna(uri, payload) {
   return new Promise(res => {
     const sh = 'luna-send -n 1 -w 5000 -f "$1" "$2" </dev/null';
-    cp.execFile('/bin/sh', ['-c', sh, 'sh', uri, JSON.stringify(payload || {})],
+    nc.execFile(cp, '/bin/sh', ['-c', sh, 'sh', uri, JSON.stringify(payload || {})],
       { env: ENV, timeout: 8000, maxBuffer: 8 << 20 }, (e, out) => {
         try { res(JSON.parse(out)); } catch (_) { res({ returnValue: false, errorText: String(e || 'bad json') }); }
       });
@@ -17,13 +19,22 @@ function luna(uri, payload) {
 }
 const readConf = () => { try { return JSON.parse(fs.readFileSync(CONF, 'utf8')); } catch (_) { return {}; } };
 const writeConf = c => { fs.writeFileSync(CONF + '.tmp', JSON.stringify(c, null, 2), { mode: 0o600 }); fs.renameSync(CONF + '.tmp', CONF); };
-let appCache = null, appCacheAt = 0;
+let appCache = null, appCacheAt = 0, appAsking = null;
+async function refreshApps() {   // single-flight: one luna call at a time; a bad reply never wipes the last good list
+  if (appAsking) return appAsking;
+  appAsking = (async () => {
+    const r = await luna('luna://com.webos.applicationManager/listApps', {});
+    if (Array.isArray(r.apps)) {
+      appCache = r.apps.filter(a => a.visible !== false && a.id !== 'com.webos.app.home')
+        .map(a => ({ id: a.id, title: a.title, icon: a.largeIcon || a.icon, folder: a.folderPath, type: a.type }));
+      appCacheAt = Date.now();
+    }
+  })();
+  try { await appAsking; } finally { appAsking = null; }
+}
 async function apps() {
-  if (appCache && Date.now() - appCacheAt < 5000) return appCache;
-  const r = await luna('luna://com.webos.applicationManager/listApps', {});
-  appCache = (r.apps || []).filter(a => a.visible !== false && a.id !== 'com.webos.app.home')
-    .map(a => ({ id: a.id, title: a.title, icon: a.largeIcon || a.icon, folder: a.folderPath, type: a.type }));
-  appCacheAt = Date.now();
+  if (!appCache) { await refreshApps(); return appCache || []; }   // the very first answer waits, like before
+  if (Date.now() - appCacheAt >= 5000) refreshApps();   // older: answer from memory now, refresh in the background
   return appCache;
 }
 

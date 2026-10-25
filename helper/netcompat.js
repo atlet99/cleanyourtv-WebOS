@@ -30,4 +30,21 @@ const randomInt = (min, max) => {
   return min + (x % range);
 };
 
-module.exports = { URL, URLSearchParams, get, request, mkdirp, randomInt };
+// execFile with a timeout that does not crash Node 8: its own timeout handling aborts with "uv_close Assertion
+// !uv__is_closing(handle)" when it fires, taking the whole service down without a trace. The child is killed with
+// SIGKILL from here instead and the callback runs exactly once (upstream issue 26 / their diag.execFile).
+const execFile = (cp, file, args, opts, cb) => {
+  const ms = opts && opts.timeout;
+  if (ms) { opts = Object.assign({}, opts); delete opts.timeout; }
+  let done = false, killer = null;
+  const child = cp.execFile(file, args, opts, function () {
+    if (done) return;
+    done = true;
+    if (killer) clearTimeout(killer);
+    cb.apply(this, arguments);
+  });
+  if (ms) killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (_) {} }, ms);
+  return child;
+};
+
+module.exports = { URL, URLSearchParams, get, request, mkdirp, randomInt, execFile };

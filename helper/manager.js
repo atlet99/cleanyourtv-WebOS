@@ -12,7 +12,7 @@ const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbi
 const semver = v => String(v || '0').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
 function cmp(a, b) { const x = semver(a), y = semver(b); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0) ? 1 : -1; return 0; }
 const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) { return d; } };
-const sh = (cmd, ms) => new Promise(res => cp.execFile('/bin/sh', ['-c', cmd], { env: ENV, timeout: ms || 60000, maxBuffer: 8 << 20 }, (e, out, err) => res({ ok: !e, out: String(out || ''), err: String(err || '') })));
+const sh = (cmd, ms) => new Promise(res => nc.execFile(cp, '/bin/sh', ['-c', cmd], { env: ENV, timeout: ms || 60000, maxBuffer: 8 << 20 }, (e, out, err) => res({ ok: !e, out: String(out || ''), err: String(err || '') })));
 
 // GET a URL (follows redirects). Returns a Buffer, or with `file` streams to disk and resolves {sha256}.
 const allowHttp = () => { if (process.env.CYTV_API) return true; try { return !!JSON.parse(fs.readFileSync(D + '/config.json', 'utf8')).releasesUrl; } catch (_) { return false; } };   // a custom release source, for testing
@@ -24,7 +24,7 @@ function fetch(url, file, hops) {
     const req = nc.get(mod, url, { headers: { 'User-Agent': 'cleanyourtv-manager', Accept: file ? 'application/octet-stream, */*' : 'application/vnd.github+json, application/json, */*' }, timeout: 20000 }, res => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) { res.resume(); return resolve(fetch(new URL(res.headers.location, url).toString(), file, (hops || 0) + 1)); }
       if (res.statusCode !== 200) { res.resume(); return reject(new Error('HTTP ' + res.statusCode)); }
-      res.on('error', reject);
+      res.on('error', reject); res.on('aborted', () => reject(new Error('the connection was lost')));
       if (!file) { const b = []; let size = 0; res.on('data', c => { size += c.length; if (size > 4 << 20) req.destroy(new Error('release metadata too large')); else b.push(c); }); res.on('end', () => resolve(Buffer.concat(b))); return; }
       const h = crypto.createHash('sha256'), w = fs.createWriteStream(file, { flags: 'wx', mode: 0o600 });
       res.on('data', c => h.update(c)); res.pipe(w);
@@ -123,7 +123,7 @@ function create(ctx) {
   }
 
   async function reloadHome() {
-    await sh('pkill -f "[a]pp-id=com.webos.app.home"; sleep 2');
+    await sh('sh ' + D + '/reload-home.sh', 90000);   // knows the per-webOS way: renderer kill, webapp-mgr or sam restart
     await luna('luna://com.webos.applicationManager/launch', { id: 'com.webos.app.home' });
   }
   async function swapIn(srcApp) {   // srcApp becomes D/app; the old one is kept as D/app.prev

@@ -373,7 +373,7 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
     const block = page.slice(page.indexOf('var stack=[], ovEl=null;'), page.indexOf('/* ---------- layout ----------'));
     ok(block.indexOf('function runningMenu') >= 0 && block.indexOf('function closeRunning') >= 0,
       'launcher page: the running-apps menu lives with the other menus');
-    let runningList = [{ id: 'netflix', title: 'Netflix' }, { id: 'youtube', title: 'YouTube' }], closes = [], toasts = [], failApi = false;
+    let runningList = [{ id: 'netflix', title: 'Netflix' }, { id: 'youtube', title: 'YouTube' }], closes = [], toasts = [], failApi = false, failClose = false, listFetches = 0;
     const rowEl = i => ({ _i: i, _kids: {}, getAttribute: () => String(i), addEventListener(type, fn) { this._click = fn; },
       querySelector: function (s) { return this._kids[s] || (this._kids[s] = { textContent: '' }); } });
     const fakeEl = () => { const e = { id: '', _html: '', _rows: [], appendChild() {}, remove() { e._gone = true; },
@@ -388,27 +388,35 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
       ' get idx() { return stack.length ? stack[stack.length - 1].idx : -1 } })',
       { document: { body: { appendChild() {} }, createElement: () => fakeEl() },
         api: (url, body) => { if (failApi && url === '/api/running') return Promise.reject(new Error('HTTP 404'));
-          if (url === '/api/running') return Promise.resolve({ apps: runningList });
+          if (url === '/api/running') { listFetches++; return Promise.resolve({ apps: runningList }); }
           if (url === '/api/running/close') { closes.push(body);
-            runningList = body.all ? [] : runningList.filter(a => a.id !== body.id);
-            return Promise.resolve({ returnValue: true }); }
+            return Promise.resolve(failClose ? { returnValue: false } : { returnValue: true }); }
           return Promise.resolve({}); },
-        t: s => s, toast: s => toasts.push(s), svg: () => '', launch() {} });
+        t: s => s, toast: s => toasts.push(s), svg: () => '', launch() {},
+        navigator: { userAgent: 'Chrome/79' } });
     const tick = () => new Promise(r => setTimeout(r, 20));
     R.runningMenu(); await tick();
     ok(R.open && R.title === 'Running apps' && R.labels.join('|') === 'Netflix|YouTube|Close all' && R.idx === 0,
       'running menu: opens with one row per app and Close all last');
     R.menuKey(13); await tick();   // OK on Netflix
-    ok(JSON.stringify(closes) === '[{"id":"netflix"}]' && R.open && R.labels.join('|') === 'YouTube|Close all',
-      'running menu: OK closes that app and the row disappears while the menu stays');
-    R.menuKey(40); R.menuKey(13); await tick();   // down to Close all, OK
-    ok(JSON.stringify(closes[1]) === '{"all":true}' && !R.open && toasts.indexOf('No running apps') >= 0,
-      'running menu: Close all empties the list and the menu goes away');
+    ok(JSON.stringify(closes) === '[{"id":"netflix"}]' && R.open && R.labels.join('|') === 'YouTube',
+      'running menu: OK closes that app, the row disappears and the lone row has no Close all duplicate');
+    ok(listFetches === 1, 'running menu: the rows update from the held list, the lagging service is not re-read');
+    R.menuKey(13); await tick();   // OK on the last app
+    ok(JSON.stringify(closes[1]) === '{"id":"youtube"}' && !R.open && toasts.indexOf('No running apps') >= 0,
+      'running menu: closing the last app empties the list and the menu goes away');
     R.runningMenu(); await tick(); R.menuKey(461);
     ok(!R.open, 'running menu: Back leaves the menu');
     failApi = true; toasts.length = 0; R.runningMenu(); await tick();
     ok(toasts.indexOf('Could not read the running apps') >= 0 && !R.open,
       'running menu: an older service (404) shows the could-not-read message, no menu');
+    failApi = false; closes.length = 0; failClose = true;
+    runningList = [{ id: 'solo', title: 'Solo' }];
+    R.runningMenu(); await tick();
+    ok(R.labels.join('|') === 'Solo', 'running menu: a single app shows without the Close all duplicate');
+    R.menuKey(13); await tick();
+    ok(R.open && toasts.indexOf('Could not close the app') >= 0 && JSON.stringify(closes[0]) === '{"id":"solo"}',
+      'running menu: a close that does not answer returnValue:true is a failure, the menu stays');
   }
 
   // 9. Themes: bundled files are valid, values are whitelisted and clamped, extends works, set / revert work, wallpapers only from the bundled folder

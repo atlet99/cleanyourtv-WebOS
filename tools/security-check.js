@@ -16,11 +16,12 @@ const security = require('../helper/security');
   assert(security.authorized(req('/icon/x?token=' + secret), secret));
   assert(security.authorized(req('/api/version', secret), secret));
   let handler, calls = 0;
-  const context = { process: { env: {} }, console: { log() {}, error() {} }, require(name) {
+  const context = { process: { env: {}, on() {} }, console: { log() {}, error() {} }, require(name) {
     if (name === 'http') return { createServer(fn) { handler = fn; return { listen() {} }; } };
     if (name === 'fs') return { readFileSync() { throw new Error('disabled'); } };
     if (name === 'path' || name === 'child_process') return {};
     if (name === './security') return security;
+    if (name === './netcompat') return { execFile(cp, file, args, opts, cb) { return cp.execFile(file, args, opts, cb); }, mkdirp: () => {}, randomInt: (a, b) => a };
     if (name === './inputhook') return { setVoiceKey() {} };
     if (name === './manager') return { create() { return { useLgHome() { calls++; } }; } };
     throw new Error('module disabled: ' + name);

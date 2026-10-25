@@ -5,6 +5,10 @@
   "entries": [
     { "firmware": "33.23.05", "sdk": "10.2.2", "homeType": "flutter", "status": "tested", "note": "OLED65G26LA, webOS 25 (tested)" },
     { "firmware": "04.64.00", "sdk": "5.6.2", "homeType": "native", "status": "tested", "note": "65UN73506LB, webOS 5 (tested)" },
+    { "firmware": "33.31.75", "sdk": "10.3.2", "homeType": "flutter", "status": "reported", "note": "43UT7590PUA, 65UT7000PUA: reported working" },
+    { "firmware": "13.40.90", "sdk": "8.4.0", "homeType": "native", "status": "reported", "note": "43UR74006LB, webOS 23: reported working" },
+    { "firmware": "03.53.45", "sdk": "6.5.3", "homeType": "native", "status": "reported", "note": "webOS 6.5 (OLED55G19LA, 65NANO753PR, OLED48C16LA): reported working" },
+    { "firmware": "03.51.16", "sdk": "6.5.0", "homeType": "", "status": "reported", "note": "OLED55C15LA: reported working" },
     { "firmware": "23.25.55", "homeType": "", "status": "reported", "note": "reported working on two models" }
   ]
 }

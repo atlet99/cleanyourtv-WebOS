@@ -51,7 +51,7 @@ function get(url, depth = 0) {
     req.on('error', reject);
   });
 }
-const readAll = s => new Promise((res, rej) => { const b = []; s.on('data', c => b.push(c)); s.on('end', () => res(Buffer.concat(b).toString('utf8'))); s.on('error', rej); });
+const readAll = s => new Promise((res, rej) => { const b = []; s.on('data', c => b.push(c)); s.on('end', () => res(Buffer.concat(b).toString('utf8'))); s.on('error', rej); s.on('aborted', () => rej(new Error('the connection was lost'))); });   // a drop after the headers only fires 'aborted'
 
 // ---- M3U ----
 const QUALITY = [[/\b(?:4k|uhd|2160p)\b/i, '4K'], [/\b(?:fhd|1080[pi])\b/i, 'FHD'], [/\b(?:hd|720p)\b/i, 'HD'], [/\b(?:sd|480p|576p)\b/i, 'SD']];

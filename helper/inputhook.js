@@ -56,7 +56,7 @@ function ensure(enabled, key) {
   for (const p of todo) {
     const log = runtime + '/lginput-hook-' + p.name + '.log';
     try { fs.writeFileSync(log, ''); } catch (_) {}
-    cp.execFile(HOOK + '/ezinject', ['-l', log, p.pid, HOOK + '/libinputhookpp.so'], { env: ENV, timeout: 20000 }, e => {
+    nc.execFile(cp, HOOK + '/ezinject', ['-l', log, p.pid, HOOK + '/libinputhookpp.so'], { env: ENV, timeout: 20000 }, e => {
       if (e) console.error('inputhook: inject ' + p.name + ':', e.message);
       if (--left === 0) busy = false;
     });

@@ -28,7 +28,7 @@ async function latest() {
   }
   throw new Error('the latest release has no package with a checksum');
 }
-const luna = (uri, payload) => new Promise(res => cp.execFile('luna-send', ['-n', '1', '-w', '5000', uri, JSON.stringify(payload)], { env: ENV, timeout: 40000 }, (e, out) => { try { res(JSON.parse(out)); } catch (_) { res({ returnValue: false }); } }));
+const luna = (uri, payload) => new Promise(res => nc.execFile(cp, 'luna-send', ['-n', '1', '-w', '5000', uri, JSON.stringify(payload)], { env: ENV, timeout: 40000 }, (e, out) => { try { res(JSON.parse(out)); } catch (_) { res({ returnValue: false }); } }));
 
 async function check() {
   const inst = installedVersion();

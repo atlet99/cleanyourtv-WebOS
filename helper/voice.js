@@ -72,7 +72,7 @@ function unzip(file, want) {
   }
   return out;
 }
-const run = (cmd, args, ms) => new Promise((res, rej) => cp.execFile(cmd, args, { env: ENV, timeout: ms || 120000, maxBuffer: 4 << 20 }, (e, o, er) => e ? rej(new Error(String(er || e.message).trim().split('\n').pop())) : res(o)));
+const run = (cmd, args, ms) => new Promise((res, rej) => nc.execFile(cp, cmd, args, { env: ENV, timeout: ms || 120000, maxBuffer: 4 << 20 }, (e, o, er) => e ? rej(new Error(String(er || e.message).trim().split('\n').pop())) : res(o)));
 
 async function doInstall() {
   rmrf(V); nc.mkdirp(TMP); nc.mkdirp(LIB); nc.mkdirp(MODEL);
