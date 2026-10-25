@@ -125,6 +125,8 @@ def selftest():
         name = PACKAGE + '_' + version + '_all.ipk'
         dist, out = root / 'dist', root / 'site' / 'repo'
         dist.mkdir(parents=True)
+        out.parent.mkdir()
+        (out.parent / 'index.html').write_text('existing documentation home')
         # A small independent IPK fixture: production IPKs still use the standalone packager, never this test writer.
         def fixture(services=()):
             entries = {
@@ -170,6 +172,7 @@ def selftest():
         assert (out / '.nojekyll').exists() and (out / 'icon.png').read_bytes() == icon.read_bytes()
         page = (out / 'index.html').read_text()
         assert 'https://example.github.io/cleanyourtv-WebOS/repo/apps.json' in page and version in page
+        assert (out.parent / 'index.html').read_text() == 'existing documentation home'
         # a package whose checksum file lies must be refused
         (dist / (name + '.sha256')).write_text('0' * 64 + '  ' + name + '\n')
         out2 = root / 'site2' / 'repo'
@@ -199,6 +202,12 @@ def selftest():
             raise AssertionError('an invalid release signature was accepted')
         except SystemExit as error:
             assert 'signature verification failed' in str(error)
+        (dist / (name + '.sha256')).unlink()
+        try:
+            build(dist, out2, 'https://example.github.io/x', 'https://github.com/example/x', icon, public_key=public)
+            raise AssertionError('a missing checksum file was accepted')
+        except SystemExit as error:
+            assert 'missing .sha256' in str(error)
         shutil.copyfile(dist / name, dist / (PACKAGE + '_9.9.8_all.ipk'))
         try:
             build(dist, out2, 'https://example.github.io/x', 'https://github.com/example/x', icon, public_key=public)

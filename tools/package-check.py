@@ -97,7 +97,7 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
                     assert package['version'] == '9.8.7'
                     assert b"const VERSION = '9.8.7'" in archive.extractfile(members[service + 'helper/helper.js']).read()
                     frontend = json.load(archive.extractfile(members[service + 'payload/app/version.json']))
-                    assert frontend['version'] == frontend['minService'] == '9.8.7'
+                    assert frontend['version'] == frontend['minService'] == '9.8.7' and frontend['apiVersion'] == 3
                     html = archive.extractfile(members[service + 'payload/app/index.html']).read()
                     assert b"VERSION='9.8.7'" in html and b"MIN_SERVICE='9.8.7'" in html
                     for app in ['manager', 'picker', 'notify']:
@@ -105,7 +105,7 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
                     assert not any('node_modules/' in m.name for m in archive.getmembers())
                 else:
                     frontend = json.load(archive.extractfile(members['app/version.json']))
-                    assert frontend['version'] == frontend['minService'] == '9.8.7'
+                    assert frontend['version'] == frontend['minService'] == '9.8.7' and frontend['apiVersion'] == 3
                     launcher = archive.extractfile(members['app/index.html']).read()
                     assert b"v.addEventListener('error',onError,true)" in launcher
                     assert b".test(url))return [{src:url,type:''},{src:url,type:'application/x-mpegURL'}" in launcher

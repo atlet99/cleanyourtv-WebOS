@@ -96,7 +96,7 @@ function create(ctx) {
     return release;
   }
   const frontendInfo = () => readJson(D + '/app/version.json', {});
-  const prevInfo = () => { const info = readJson(D + '/app.prev/version.json', null); return info && info.apiVersion === 2 ? info : null; };
+  const prevInfo = () => { const info = readJson(D + '/app.prev/version.json', null); return info && info.apiVersion === 3 ? info : null; };
   const options = () => Object.assign({ debloat: true, inputKey: true, liveTv: true }, readConf().options || {});
 
   function status() {
@@ -151,7 +151,7 @@ function create(ctx) {
       if (!(await sh('cd ' + T + ' && tar xzf f.tgz')).ok) throw new Error('could not unpack');
       const nv = readJson(T + '/app/version.json', {});
       if (nv.version !== ver || !fs.existsSync(T + '/app/index.html')) throw new Error('the download is not launcher ' + ver);
-      if (nv.apiVersion !== 2) throw new Error('this launcher does not support API authorization');
+      if (nv.apiVersion !== 3) throw new Error('this launcher does not support API authorization');
       if (nv.minService && cmp(VERSION, nv.minService) < 0) throw new Error('needs service ' + nv.minService + ' or newer; update the service first');
       setJob('working', 'Installing launcher ' + ver);
       frontendOk = null;

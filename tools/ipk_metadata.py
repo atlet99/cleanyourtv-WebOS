@@ -35,7 +35,7 @@ def validate_manager_ipk(file):
     package_path = 'usr/palm/packages/' + PACKAGE + '/packageinfo.json'
     with tarfile.open(fileobj=io.BytesIO(parts['data.tar.gz']), mode='r|gz') as archive:
         for member in archive:
-            name = member.name.removeprefix('./').rstrip('/')
+            name = PurePosixPath(member.name).as_posix()
             if member.offset_data + member.size > 128 * 1024 * 1024 or len(names) >= 4096:
                 raise ValueError('IPK exceeds metadata-check limits')
             if member.size < 0 or name in names or name.startswith('/') or '..' in PurePosixPath(name).parts or not (member.isfile() or member.isdir()):

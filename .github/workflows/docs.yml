@@ -1,4 +1,4 @@
-# Builds the documentation (https://zensical.org) on every change to it, and publishes it to GitHub Pages from main.
+# Validates documentation PRs; Release calls this workflow to publish the checked main site and HBC feed.
 # Also publishes the Homebrew Channel repository feed (/repo/apps.json) from the latest release.
 # GitHub Pages uses "GitHub Actions" as its source (repository Settings > Pages).
 name: Documentation
@@ -8,13 +8,6 @@ on:
       CYTV_RELEASE_PUBLIC_KEY_PEM:
         required: false
   workflow_dispatch:
-  push:
-    paths:
-      - "docs/**"
-      - "zensical.toml"
-      - "tools/make-repo-feed.py"
-      - "tools/ipk_metadata.py"
-      - ".github/workflows/docs.yml"
   pull_request:
     paths:
       - "docs/**"

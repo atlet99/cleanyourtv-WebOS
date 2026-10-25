@@ -242,7 +242,9 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
   const previousDir = path.join(process.env.CYTV_DIR, 'app.prev'); fs.mkdirSync(previousDir);
   fs.writeFileSync(path.join(previousDir, 'version.json'), JSON.stringify({ version: '1.4.12' }));
   r = await ask('status', 'GET'); ok(r.j.frontend.previous === null, 'rollback does not offer a legacy launcher without authenticated API support');
-  fs.writeFileSync(path.join(previousDir, 'version.json'), JSON.stringify({ version: '1.4.13', apiVersion: 2 }));
+  fs.writeFileSync(path.join(previousDir, 'version.json'), JSON.stringify({ version: '1.6.2', apiVersion: 2 }));
+  r = await ask('status', 'GET'); ok(r.j.frontend.previous === null, 'rollback does not offer a launcher pointing to the removed service directory');
+  fs.writeFileSync(path.join(previousDir, 'version.json'), JSON.stringify({ version: '1.4.13', apiVersion: 3 }));
   r = await ask('status', 'GET'); ok(r.j.frontend.previous === '1.4.13', 'rollback offers a previous launcher that supports the authenticated API');
 
   // 7. Live TV is optional: the option is stored and the key binds are refreshed

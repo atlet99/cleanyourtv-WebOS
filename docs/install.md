@@ -103,6 +103,7 @@ The updated SSH installer performs this handoff automatically. An updater proces
 path in memory and cannot perform that first handoff itself. The working directory, configuration, API token, learned keys
 and boot hooks remain under `/media/developer/cleanyourtv`; do not delete it or uninstall to perform this transition.
 Reopen the manager after completion. Future updates use the new path normally.
+Old saved launcher pages that reference the removed directory are not offered for rollback; new compatible versions are retained normally.
 
 ## Unlisted firmware
 

@@ -47,7 +47,8 @@ ssh root@192.168.1.50 'CYTV_RELEASE_KEY=/home/root/cytv-release-public.pem sh /h
 
 Do not fetch the key from the release being installed. Existing installations can migrate with this command too.
 Update the service package before the standalone launcher: launcher 1.4.13 requires service 1.5.13 or newer.
-Only launchers marked `apiVersion: 2` support the authenticated API; older saved launchers are not offered for rollback.
+Launchers marked `apiVersion: 3` obtain the API token through the manager app's `root/` resources. Saved version-2 clients
+reference the removed service directory and are not offered for rollback. The token format and stored token stay unchanged.
 Restart the TV once after migration so previously injected input hooks reopen their logs in the private directory.
 Subsequent updates use the key bundled in the installed service. Key rotation requires an update signed by the
 previously trusted key or explicit local replacement. Older services do not gain enforcement until replaced.

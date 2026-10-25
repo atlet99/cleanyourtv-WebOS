@@ -52,6 +52,7 @@ The release job exposes `new_release_published` and `new_release_version` for fu
 After a successful main release job, it explicitly calls the Documentation workflow to rebuild both the site and `/repo/`.
 This does not rely on the `release` event, which GitHub suppresses for releases created with `GITHUB_TOKEN`.
 Pages builds/deployments are serialised together; the feed is always generated after the clean documentation build.
+Main pushes reach Pages through Release rather than a second competing push-triggered deployment.
 Downloads use an explicit latest-release tag, and API/download/verification failures stop deployment instead of removing the feed.
 Only the public verification key is passed to the called Pages workflow, never the private signing key.
 
