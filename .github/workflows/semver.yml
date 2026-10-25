@@ -1,0 +1,39 @@
+name: SemVer
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled, ready_for_review]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  impact:
+    name: SemVer impact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Require one declared compatibility impact
+        run: python3 tools/release.py check-pr
+      # Adoption bootstrap: the base configuration cannot exist on main before the first PR that adds it
+      # merges. Once it is there, full strict validation activates; until then only the label check runs.
+      - name: Check base configuration availability
+        id: base-config
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/contents/.github/release-drafter.yml?ref=main" > /dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Release Drafter config is not on main yet; full category validation starts after it merges"
+          fi
+      - name: Validate Release Drafter configuration and PR category
+        if: steps.base-config.outputs.available == 'true'
+        uses: release-drafter/release-drafter/check-pr@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
+        with:
+          config-name: release-drafter.yml

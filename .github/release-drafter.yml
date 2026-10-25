@@ -1,0 +1,31 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+tag-prefix: v
+categories:
+  - type: pre-include
+    when:
+      labels: ['semver:major', 'semver:minor', 'semver:patch']
+  - type: pre-exclude
+    when:
+      label: 'semver:none'
+  - title: Breaking changes
+    semver-increment: major
+    when:
+      label: 'semver:major'
+  - title: Features and deprecations
+    semver-increment: minor
+    when:
+      label: 'semver:minor'
+  - title: Fixes
+    semver-increment: patch
+    when:
+      label: 'semver:patch'
+change-template: '- $TITLE ([PR $NUMBER]($URL)) — $AUTHORS'
+change-title-escapes: '\<*_&#@'
+no-changes-template: '<!-- no-release-changes -->'
+template: |
+  ## Changes
+
+  $CHANGES
+
+  [Full comparison](https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$RESOLVED_TAG)

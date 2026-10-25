@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import yaml
 
 import release
 
@@ -27,36 +28,45 @@ with tempfile.TemporaryDirectory(prefix='cytv-release-') as directory:
 
     git('init', '-q', '-b', 'main')
     initial = commit('Initial implementation', 'helper/helper.js', "const VERSION = '1.5.13';\n")
-    first = release.plan('owner/project', [], root)
-    assert first['version'] == '1.5.13' and first['source'] == initial
-    git('tag', 'v1.5.13')
-    published = [{'tag_name': 'v1.5.13', 'draft': False, 'prerelease': False}]
-    assert not release.plan('owner/project', published, root)['publish']
-    commit('docs: explain setup', 'docs/index.md', 'Docs only')
-    assert not release.plan('owner/project', published, root)['publish']
-    commit('fix(player): retry stream', 'app/index.html', '<p>fixed</p>')
-    assert release.plan('owner/project', published, root)['version'] == '1.5.14'
-    commit('[FEATURE] - add a setting;', 'shared/new.js', 'var setting = true;')
-    assert release.plan('owner/project', published, root)['version'] == '1.6.0'
-    commit('refactor!: change service contract', 'helper/new.js', 'var api = 2;')
-    assert release.plan('owner/project', published, root)['version'] == '2.0.0'
-    assert release.change_kind('fix: update', 'BREAKING CHANGE: incompatible format') == 'major'
-    assert release.change_kind('feat(ui): new view') == 'minor'
-    assert release.change_kind('[FIX] - retry;') == 'patch'
-    git('tag', 'v2.0.0', initial)
-    data = release.plan('owner/project', published, root)
-    assert data['version'] == '2.0.1', 'existing tags must never be replaced'
+    config = yaml.safe_load((release.ROOT / '.github/release-drafter.yml').read_text())
+    rules = {c['when']['label']: c['semver-increment'] for c in config['categories'] if 'title' in c}
+    assert rules == {'semver:major': 'major', 'semver:minor': 'minor', 'semver:patch': 'patch'}
+    assert config['tag-template'] == 'v$RESOLVED_VERSION' and config['tag-prefix'] == 'v'
+    assert any(c.get('type') == 'pre-include' and set(c['when']['labels']) == set(rules) for c in config['categories'])
+    assert any(c.get('type') == 'pre-exclude' and c['when'].get('label') == 'semver:none' for c in config['categories'])
+    assert all('conventional' not in c.get('when', {}) for c in config['categories'])
+    for label in release.LABELS:
+        assert release.check_pr_labels(['bug', label]) == label
+    for invalid in [[], ['semver:patch', 'semver:minor'], ['semver:patch', 'semver:none'], ['semver:feature']]:
+        try:
+            release.check_pr_labels(invalid)
+            raise AssertionError('an ambiguous/missing PR impact was accepted')
+        except ValueError:
+            pass
+    assert not release.prepare('owner/project', '', '', '', [], root)['publish']
+    assert not release.prepare('owner/project', '', '', '', ['semver:none'], root)['publish']
+    # These are Action outputs, not versions computed by the repository. A FEATURE word cannot change the supplied patch.
+    for resolved, label in [('1.7.1', 'semver:patch'), ('1.8.0', 'semver:minor'), ('2.0.0', 'semver:major')]:
+        result = release.prepare('owner/project', resolved, 'v' + resolved, '[FEATURE] internal compatibility bug fix', [label], root)
+        assert result['version'] == resolved and result['source'] == initial
+    for invalid in ['01.7.1', '1.07.1', '1.7.01', '1.7', 'v1.7.1', '1.7.1-rc.1', '1.7.1+sha.a1', '1.2٣.4', '1.1000000000.0']:
+        try:
+            release.version(invalid)
+            raise AssertionError('an unsupported LG package version was accepted')
+        except ValueError:
+            pass
+    git('tag', 'v1.8.0', initial)
+    commit('Update code without any release keywords', 'app/index.html', '<p>fixed</p>')
     before = git('tag', '--list')
-    draft = {'tag_name': 'v2.0.1', 'draft': True, 'prerelease': False, 'body': 'manual draft'}
-    assert release.plan('owner/project', published + [draft], root)['version'] == '2.0.2'
-    draft['body'] = release.marker(data['source'])
-    assert release.plan('owner/project', published + [draft], root) == data
-    assert before == git('tag', '--list'), 'planning must not create tags'
-    assert 'retry stream' in data['notes'] and 'add a setting' in data['notes']
-    assert release.releasable('.github/actions/package-webos/package-lock.json')
-    assert not release.releasable('.github/workflows/release.yml')
-    assert not release.releasable('themes/README.md')
-    print('ok   release planning: first version, no-op/docs, patch/minor/major, legacy subjects, reserved tags and draft retries')
+    try:
+        release.prepare('owner/project', '1.8.0', 'v1.8.0', 'Changes', ['semver:minor'], root)
+        raise AssertionError('a reserved tag on another commit was accepted')
+    except ValueError as error:
+        assert 'another commit' in str(error)
+    data = release.prepare('owner/project', '1.7.1', 'v1.7.1', 'Fixes', ['semver:patch'], root)
+    assert data['notes'].endswith(release.marker(data['source']) + '\n')
+    assert before == git('tag', '--list'), 'preparation must not create tags'
+    print('ok   SemVer integration: PR intent, native label rules, Action output validation, LG format and immutable tags')
 
     private, public = root / 'private.pem', root / 'public.pem'
     subprocess.run(['openssl', 'genrsa', '-out', str(private), '2048'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

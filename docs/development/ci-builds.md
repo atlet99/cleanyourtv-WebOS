@@ -24,18 +24,25 @@ The Release workflow independently requires the same checks even for direct push
 **Release** runs on every push to `main`, runs the reusable checks again for that exact commit and publishes only after they succeed.
 The workflow can also be rerun or manually started on `main`.
 
-`tools/release.py` compares application/packaging paths with the latest published stable release:
+The version follows [Semantic Versioning 2.0.0](versioning.md) and is declared **on the pull request** with one
+`semver:*` label, which the `SemVer` workflow validates ([Versioning policy](versioning.md) defines the public
+contract behind each choice). After the merge, Release asks [Release Drafter](https://github.com/release-drafter/release-drafter)
+(pinned to the reviewed 7.10.0 commit, `dry-run`) to resolve the next version and the grouped notes from the merged
+PRs' labels against the last published release. `tools/release.py prepare` then only **validates** that output —
+LG-compatible stable `X.Y.Z`, at most nine digits per component, no moving of existing tags — and appends the build
+commit; it no longer parses commit messages, so words like `[FEATURE]` have no effect.
 
-| Commit convention | Version increment |
+| PR label | Version increment |
 |---|---|
-| `feat:`, `feat(scope):`, `[FEATURE]`, `[ADD]` | Minor |
-| `type!:`, `type(scope)!:`, `BREAKING CHANGE:` footer, `[BREAKING]` | Major |
-| Other changes to application/packaging files, including `fix:` and `[FIX]` | Patch |
-| Documentation/CI-only changes or no remaining code diff | No IPK release |
+| `semver:patch` | Patch (`1.7.0` → `1.7.1`) |
+| `semver:minor` | Minor (`1.7.0` → `1.8.0`); also for deprecations |
+| `semver:major` | Major (`1.7.0` → `2.0.0`); the PR must explain the migration |
+| `semver:none` | No application release (tests, CI, editorial docs) |
 
-The highest increment among relevant commits wins. The first release uses the service's current development version as a floor.
-The planner ignores prereleases, produces grouped notes with commit/comparison links, and does not alter tracked source files.
-No npm publishing, Nix job, PAT or bot version commit is required. The normal `GITHUB_TOKEN` with `contents: write` is used only in the release job.
+PRs without a release label produce no IPK release. A merged set whose highest impact is minor yields the minor
+version even if a subject happens to say `[FEATURE]` or `[FIX]` — the label, not the wording, decides.
+No npm publishing, Nix job, PAT or bot version commit is required. The normal `GITHUB_TOKEN` with `contents: write`
+is used only in the release job.
 
 For a releasable change, the job installs the locked **`@atlet99/webos-packager-plugin/core` 2.2.0** in a private temporary directory,
 builds the production files with the planned version, signs and verifies their SHA-256 files, and creates a draft release at the checked commit.
@@ -45,7 +52,7 @@ It does not depend on a second workflow being triggered by a bot-created tag.
 
 Release runs are serialised. If `main` advances during the build/upload, publication is skipped and a later checked run aggregates
 the remaining changes. Published stable tags/releases are never rewritten. An interrupted upload can reuse this workflow's own matching draft;
-a conflicting existing tag or manual draft reserves that version and causes the planner to select a new patch number.
+a conflicting existing tag reserves that version and causes Release Drafter's next calculation to move past it.
 Production publication is never tested by contacting GitHub from the regression suite: its API is faked there.
 
 The release job exposes `new_release_published` and `new_release_version` for future downstream jobs.
@@ -139,6 +146,7 @@ cp .github/actions/package-webos/package.json .github/actions/package-webos/pack
 NODE_PATH="$tooling/node_modules" python3 tools/package-check.py
 NODE_PATH="$tooling/node_modules" python3 .github/actions/package-webos/check.py
 python3 tools/release-check.py
+python3 tools/make-repo-feed.py --selftest
 rm -rf "$tooling"
 ```
 
