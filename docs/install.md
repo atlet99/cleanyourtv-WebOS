@@ -7,10 +7,12 @@ The linked releases and release-key setup apply to this fork, not to the origina
 ## Quick start
 
 1. Root the TV and install the Homebrew Channel ([rootmy.tv](https://rootmy.tv)).
-2. From your computer, run the install command with the TV's IP address (below). It installs the **CleanYourTV** manager app.
-3. On the TV, open **CleanYourTV** and choose **Set up now**. It takes about a minute and the screen blinks once.
+2. Add this repository's feed to the Homebrew Channel (**Manage feeds** > **+**):
+   `https://atlet99.github.io/cleanyourtv-WebOS/repo/apps.json`
+3. Install **CleanYourTV** from the channel, open it and choose **Set up now**. It takes about a minute and the screen blinks once.
 
-That is all. The launcher is LG's Home from then on.
+That is all. The launcher is LG's Home from then on. The feed serves the latest release, so later updates appear in the
+channel too. Prefer SSH? Use the install command below instead.
 
 ## Requirements
 
@@ -27,7 +29,19 @@ That is all. The launcher is LG's Home from then on.
 
 ## Install steps
 
-### 1. Install the manager app
+### Install from the Homebrew Channel repository
+
+The easiest way, no computer needed. In the Homebrew Channel (the mug) open **Manage feeds**, tap **+** and add:
+
+```text
+https://atlet99.github.io/cleanyourtv-WebOS/repo/apps.json
+```
+
+Then install **CleanYourTV** from the channel and choose **Set up now** on the first start. The feed serves the latest
+release at a permanent address, so channel updates arrive the same way. The channel checks the package's SHA-256 from
+the feed; the releases themselves are additionally signed and verified by the TV ([security](security.md)).
+
+### 1. Install the manager app (over SSH)
 
 From your computer, with your TV's IP address:
 

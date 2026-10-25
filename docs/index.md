@@ -6,7 +6,7 @@
     The original webOS implementation is by lasharor and the upstream contributors. This fork adds Russian localisation,
     security hardening and its own documentation site. Its releases are separate from upstream releases.
 
-**[Download releases](https://github.com/atlet99/cleanyourtv-WebOS/releases)** · [Installation](install.md) · [Source code](https://github.com/atlet99/cleanyourtv-WebOS)
+**[Download releases](https://github.com/atlet99/cleanyourtv-WebOS/releases)** · [Installation](install.md) · [Add to the Homebrew Channel](install.md#install-from-the-homebrew-channel-repository) · [Source code](https://github.com/atlet99/cleanyourtv-WebOS)
 
 A fast home screen for rooted LG webOS TVs. It replaces LG's Home with a dock of four apps, a top shelf and an app grid,
 and adds Live TV from your own playlist, an Inputs list on the Input key, picture notifications from your network, optional
