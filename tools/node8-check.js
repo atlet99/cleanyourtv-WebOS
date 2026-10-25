@@ -367,6 +367,50 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
       'running: close all closes every listed app, and only those');
   }
 
+  // 8c. the launcher's Running apps menu itself: the page's real functions on a fake DOM (issue #8)
+  {
+    const page = fs.readFileSync(path.join(root, 'app', 'index.html'), 'utf8');
+    const block = page.slice(page.indexOf('var stack=[], ovEl=null;'), page.indexOf('/* ---------- layout ----------'));
+    ok(block.indexOf('function runningMenu') >= 0 && block.indexOf('function closeRunning') >= 0,
+      'launcher page: the running-apps menu lives with the other menus');
+    let runningList = [{ id: 'netflix', title: 'Netflix' }, { id: 'youtube', title: 'YouTube' }], closes = [], toasts = [], failApi = false;
+    const rowEl = i => ({ _i: i, _kids: {}, getAttribute: () => String(i), addEventListener(type, fn) { this._click = fn; },
+      querySelector: function (s) { return this._kids[s] || (this._kids[s] = { textContent: '' }); } });
+    const fakeEl = () => { const e = { id: '', _html: '', _rows: [], appendChild() {}, remove() { e._gone = true; },
+        querySelector(s) { return s === 'h2' ? (e._h2 || (e._h2 = { textContent: '' })) : e._rows[0]; },
+        querySelectorAll() { return e._rows; } };
+      Object.defineProperty(e, 'innerHTML', { set(v) { e._html = v; e._rows = []; const re = /data-i="(\d+)"/g; let m;
+        while ((m = re.exec(v))) e._rows.push(rowEl(+m[1])); }, get() { return e._html; } });
+      return e; };
+    const R = vm.runInNewContext(block + ';({ runningMenu: runningMenu, closeMenus: closeMenus, menuKey: menuKey,' +
+      ' get open() { return !!ovEl; }, get title() { return ovEl && ovEl._h2 ? ovEl._h2.textContent : ""; },' +
+      ' get labels() { return ovEl ? ovEl._rows.map(function (r) { return r._kids[".lb"].textContent; }) : []; },' +
+      ' get idx() { return stack.length ? stack[stack.length - 1].idx : -1 } })',
+      { document: { body: { appendChild() {} }, createElement: () => fakeEl() },
+        api: (url, body) => { if (failApi && url === '/api/running') return Promise.reject(new Error('HTTP 404'));
+          if (url === '/api/running') return Promise.resolve({ apps: runningList });
+          if (url === '/api/running/close') { closes.push(body);
+            runningList = body.all ? [] : runningList.filter(a => a.id !== body.id);
+            return Promise.resolve({ returnValue: true }); }
+          return Promise.resolve({}); },
+        t: s => s, toast: s => toasts.push(s), svg: () => '', launch() {} });
+    const tick = () => new Promise(r => setTimeout(r, 20));
+    R.runningMenu(); await tick();
+    ok(R.open && R.title === 'Running apps' && R.labels.join('|') === 'Netflix|YouTube|Close all' && R.idx === 0,
+      'running menu: opens with one row per app and Close all last');
+    R.menuKey(13); await tick();   // OK on Netflix
+    ok(JSON.stringify(closes) === '[{"id":"netflix"}]' && R.open && R.labels.join('|') === 'YouTube|Close all',
+      'running menu: OK closes that app and the row disappears while the menu stays');
+    R.menuKey(40); R.menuKey(13); await tick();   // down to Close all, OK
+    ok(JSON.stringify(closes[1]) === '{"all":true}' && !R.open && toasts.indexOf('No running apps') >= 0,
+      'running menu: Close all empties the list and the menu goes away');
+    R.runningMenu(); await tick(); R.menuKey(461);
+    ok(!R.open, 'running menu: Back leaves the menu');
+    failApi = true; toasts.length = 0; R.runningMenu(); await tick();
+    ok(toasts.indexOf('Could not read the running apps') >= 0 && !R.open,
+      'running menu: an older service (404) shows the could-not-read message, no menu');
+  }
+
   // 9. Themes: bundled files are valid, values are whitelisted and clamped, extends works, set / revert work, wallpapers only from the bundled folder
   const themeMod = require(path.join(helper, 'theme')), tdir = path.join(root, 'themes');
   const bundled = fs.readdirSync(tdir).filter(n => /\.json$/.test(n));

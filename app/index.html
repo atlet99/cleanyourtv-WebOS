@@ -413,7 +413,7 @@ function act(e){
 /* ---------- menus ---------- */
 var stack=[], ovEl=null;
 function openMenu(title,items){stack.push({title:title,items:items,idx:0});drawMenu()}
-function closeMenus(){stack=[];if(ovEl){ovEl.remove();ovEl=null}}
+function closeMenus(){stack=[];lastBack=0;if(ovEl){ovEl.remove();ovEl=null}}
 function backMenu(){stack.pop();if(stack.length)drawMenu();else closeMenus()}
 function drawMenu(){
   var m=stack[stack.length-1],N=8,start=Math.max(0,Math.min(m.idx-3,m.items.length-N));
@@ -451,8 +451,8 @@ function inputsMenu(){api('/api/inputs').then(function(x){
 
 /* Running apps (second Back on the home screen): LG's own Home opens its Recents panel the same way */
 function runningMenu(){api('/api/running').then(function(x){
-  var items=(x.apps||[]).map(function(a){return {label:a.title,fn:function(){closeRunning(a.id)}}});
-  if(items.length)items.push({label:t('Close all'),fn:function(){closeRunning(null)}});
+  var items=(x.apps||[]).map(function(a){return {label:a.title,stay:true,fn:function(){closeRunning(a.id)}}});
+  if(items.length)items.push({label:t('Close all'),stay:true,fn:function(){closeRunning(null)}});
   if(!items.length){closeMenus();return toast(t(x.error?'Could not read the running apps':'No running apps'))}
   openMenu(t('Running apps'),items)}).catch(function(){toast(t('Could not read the running apps'))})}
 function closeRunning(id){api('/api/running/close',id===null?{all:true}:{id:id}).then(function(x){
@@ -582,6 +582,7 @@ function wantInputs(){var p={};try{p=JSON.parse(webOSSystem.launchParams||'{}')}
   if(p&&p.inputs){closeMenus();inputsMenu()}
   else if(p&&p.live&&liveOn()){closeMenus();LIVE.enter(!!p.guide)}}
 document.addEventListener('webOSRelaunch',function(){var p={};try{p=JSON.parse(webOSSystem.launchParams||'{}')}catch(e){}
+  closeMenus();   /* Home pressed again: no menu survives it */
   if(LIVE.on&&p&&p.guide&&liveOn()){LIVE.toggleGuide();return}   /* the Guide button while Live TV is open */
   if(LIVE.on)LIVE.exit();load();wantInputs()});
 document.addEventListener('visibilitychange',function(){if(document.hidden){closeMenus();if(LIVE.on)LIVE.exit()}else load()});
