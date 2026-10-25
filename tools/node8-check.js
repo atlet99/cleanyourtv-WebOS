@@ -316,6 +316,101 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
   await vask('set', { llm: { clearKey: true } }); r = await vask('ask', { text: 'turn on the light', card: false }); ok(!r.j.answer && /Home Assistant:/.test(r.j.error), 'Home Assistant unreachable and no AI: the error is reported');
   await vask('set', { ha: { clear: true } }); r = await vask('status', null, 'GET'); ok(r.j.ha.configured === false && r.j.ha.hasToken === false, 'removing Home Assistant clears the address and token');
   haSrv.close(); orSrv.close();
+  // 8b. the Running apps menu: what listApps knows minus Home and CleanYourTV's own apps (issue #8)
+  {
+    const APPS = [{ id: 'com.webos.app.home', title: 'Home' }, { id: 'netflix', title: 'Netflix' },
+      { id: 'com.cleanyourtv.manager', title: 'Manager' }, { id: 'com.cleanyourtv.picker', title: 'Picker' }, { id: 'hidden.app', title: 'Hidden' }];
+    const RUNNING = [{ appId: 'com.webos.app.home' }, { appId: 'netflix' }, { appId: 'com.cleanyourtv.manager' },
+      { appId: 'hidden.app' }, { id: 'unknown.app' }, { appId: 'netflix' }];
+    let failClose = false;
+    const calls = [];
+    const luna = async (uri, p) => { calls.push([uri, p]);
+      if (/listApps$/.test(uri)) return { apps: APPS };
+      if (/\/running$/.test(uri)) return { running: RUNNING };
+      if (/closeByAppId$/.test(uri)) return failClose ? { returnValue: false, errorText: 'refused' } : { returnValue: true };
+      if (/applicationManager\/close$/.test(uri)) return { returnValue: true };
+      if (/removeRecent$/.test(uri)) return { returnValue: false, errorText: 'no such service' };
+      return { returnValue: false };
+    };
+    const mod = require(path.join(helper, 'running'));
+    ok(mod.pick([{ appId: 'a.app' }, { id: 'b.app' }, { appId: 'a.app' }], [{ id: 'a.app', title: 'A' }, { id: 'b.app' }]).map(a => a.id).join() === 'a.app,b.app',
+      'running pick: id and appId entries are deduplicated and take their title from listApps');
+    const run = mod.create({ luna: luna });
+    let l = await run.list();
+    ok(l.apps.map(a => a.id).join() === 'netflix,hidden.app',
+      'running: Home, own apps, apps the launcher does not know and duplicates are not listed');
+    const ask2 = async (act, body, method) => { const x = fake('/api/running' + act, method || 'GET'); await run.handle(x.req, x.res, '/api/running' + act, async () => body || {}); return { code: x.res.code, j: JSON.parse(x.res.out) }; };
+    r = await ask2('/close', { id: 'com.webos.app.home' }, 'POST');
+    ok(r.j.returnValue === false && r.j.errorText === 'not a running app' && calls.every(c => !/close/.test(c[0])),
+      'running: Home cannot be closed through the route');
+    r = await ask2('/close', { id: 'com.cleanyourtv.manager' }, 'POST');
+    ok(r.j.returnValue === false, 'running: CleanYourTV apps cannot be closed through the route');
+    r = await ask2('/close', { id: 'unknown.app' }, 'POST');
+    ok(r.j.returnValue === false, 'running: an app that is not on the list is refused');
+    let c0 = calls.length;
+    r = await ask2('/close', { id: 'netflix' }, 'POST');
+    ok(r.j.returnValue === true && r.j.closed.join() === 'netflix'
+      && calls.slice(c0).some(c => /closeByAppId$/.test(c[0]) && c[1].id === 'netflix')
+      && calls.slice(c0).some(c => /removeRecent$/.test(c[0]) && c[1].appId === 'netflix'),
+      'running: a listed app is closed and dropped from LG\'s recents (which may refuse, and that is ignored)');
+    c0 = calls.length;
+    failClose = true;
+    r = await ask2('/close', { id: 'netflix' }, 'POST');
+    ok(r.j.returnValue === true && calls.slice(c0).some(c => /closeByAppId$/.test(c[0]) && c[1].id === 'netflix')
+      && calls.slice(c0).some(c => /applicationManager\/close$/.test(c[0]) && c[1].id === 'netflix')
+      && calls.slice(c0).some(c => /removeRecent$/.test(c[0])),
+      'running: when closeByAppId fails, plain close is the fallback and the app still leaves the recents');
+    failClose = false;
+    c0 = calls.length;
+    r = await ask2('/close', { all: true }, 'POST');
+    ok(r.j.returnValue === true && r.j.closed.join() === 'netflix,hidden.app' && calls.slice(c0).filter(c => /closeByAppId/.test(c[0])).length === 2,
+      'running: close all closes every listed app, and only those');
+  }
+
+  // 8c. the launcher's Running apps menu itself: the page's real functions on a fake DOM (issue #8)
+  {
+    const page = fs.readFileSync(path.join(root, 'app', 'index.html'), 'utf8');
+    const block = page.slice(page.indexOf('var stack=[], ovEl=null;'), page.indexOf('/* ---------- layout ----------'));
+    ok(block.indexOf('function runningMenu') >= 0 && block.indexOf('function closeRunning') >= 0,
+      'launcher page: the running-apps menu lives with the other menus');
+    let runningList = [{ id: 'netflix', title: 'Netflix' }, { id: 'youtube', title: 'YouTube' }], closes = [], toasts = [], failApi = false;
+    const rowEl = i => ({ _i: i, _kids: {}, getAttribute: () => String(i), addEventListener(type, fn) { this._click = fn; },
+      querySelector: function (s) { return this._kids[s] || (this._kids[s] = { textContent: '' }); } });
+    const fakeEl = () => { const e = { id: '', _html: '', _rows: [], appendChild() {}, remove() { e._gone = true; },
+        querySelector(s) { return s === 'h2' ? (e._h2 || (e._h2 = { textContent: '' })) : e._rows[0]; },
+        querySelectorAll() { return e._rows; } };
+      Object.defineProperty(e, 'innerHTML', { set(v) { e._html = v; e._rows = []; const re = /data-i="(\d+)"/g; let m;
+        while ((m = re.exec(v))) e._rows.push(rowEl(+m[1])); }, get() { return e._html; } });
+      return e; };
+    const R = vm.runInNewContext(block + ';({ runningMenu: runningMenu, closeMenus: closeMenus, menuKey: menuKey,' +
+      ' get open() { return !!ovEl; }, get title() { return ovEl && ovEl._h2 ? ovEl._h2.textContent : ""; },' +
+      ' get labels() { return ovEl ? ovEl._rows.map(function (r) { return r._kids[".lb"].textContent; }) : []; },' +
+      ' get idx() { return stack.length ? stack[stack.length - 1].idx : -1 } })',
+      { document: { body: { appendChild() {} }, createElement: () => fakeEl() },
+        api: (url, body) => { if (failApi && url === '/api/running') return Promise.reject(new Error('HTTP 404'));
+          if (url === '/api/running') return Promise.resolve({ apps: runningList });
+          if (url === '/api/running/close') { closes.push(body);
+            runningList = body.all ? [] : runningList.filter(a => a.id !== body.id);
+            return Promise.resolve({ returnValue: true }); }
+          return Promise.resolve({}); },
+        t: s => s, toast: s => toasts.push(s), svg: () => '', launch() {} });
+    const tick = () => new Promise(r => setTimeout(r, 20));
+    R.runningMenu(); await tick();
+    ok(R.open && R.title === 'Running apps' && R.labels.join('|') === 'Netflix|YouTube|Close all' && R.idx === 0,
+      'running menu: opens with one row per app and Close all last');
+    R.menuKey(13); await tick();   // OK on Netflix
+    ok(JSON.stringify(closes) === '[{"id":"netflix"}]' && R.open && R.labels.join('|') === 'YouTube|Close all',
+      'running menu: OK closes that app and the row disappears while the menu stays');
+    R.menuKey(40); R.menuKey(13); await tick();   // down to Close all, OK
+    ok(JSON.stringify(closes[1]) === '{"all":true}' && !R.open && toasts.indexOf('No running apps') >= 0,
+      'running menu: Close all empties the list and the menu goes away');
+    R.runningMenu(); await tick(); R.menuKey(461);
+    ok(!R.open, 'running menu: Back leaves the menu');
+    failApi = true; toasts.length = 0; R.runningMenu(); await tick();
+    ok(toasts.indexOf('Could not read the running apps') >= 0 && !R.open,
+      'running menu: an older service (404) shows the could-not-read message, no menu');
+  }
+
   // 9. Themes: bundled files are valid, values are whitelisted and clamped, extends works, set / revert work, wallpapers only from the bundled folder
   const themeMod = require(path.join(helper, 'theme')), tdir = path.join(root, 'themes');
   const bundled = fs.readdirSync(tdir).filter(n => /\.json$/.test(n));
@@ -428,6 +523,8 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
     svc.stderr.on('data', c => errs.push(String(c)));
     for (let i = 0; i < 40; i++) { try { await call2('GET', '/api/version'); break; } catch (_) { await new Promise(r => setTimeout(r, 250)); } }
     const st = await call2('GET', '/api/manager/status');
+    const run = await call2('GET', '/api/running');
+    ok(run.status === 200 && Array.isArray(run.j.apps), 'the running-apps route is mounted in the real service (no luna here: an empty list is fine)');
     ok(st.j.options.inputKey === false && st.j.options.debloat === true && st.j.options.liveTv === false,
       'status reports the stored options after the update, defaults did not shadow them');
     ok(st.j.keys.input === '55' && st.j.keys.guide === '88' && st.j.keys.learned === true, 'status reports the stored learned keys');

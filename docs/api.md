@@ -11,6 +11,8 @@ you can call it from a shell on the TV (for example over SSH).
 |---|---|
 | `GET /api/apps` | Installed apps, config, usage, version |
 | `POST /api/launch` `{id, params}` | Launch an app |
+| `GET /api/running` | Apps that are open now (never Home, never CleanYourTV's own apps) |
+| `POST /api/running/close` `{id}` or `{all: true}` | Close listed running apps and drop them from LG's recents |
 | `GET /api/inputs` | HDMI inputs and their state |
 | `POST /api/picker/release` | Close the Inputs picker app (the page calls this when it is done; nothing stays hidden) |
 | `POST /api/notify` | Picture notification (on the network: `POST :8767/notify` with the token) |

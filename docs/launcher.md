@@ -22,6 +22,7 @@ same on every supported webOS version.
 | Customise | The **Customise** button |
 | Live TV | The **Live TV** button or tile |
 | Switch input | The **Inputs** button |
+| Running apps | **Back** twice on the home screen |
 
 The Magic Remote pointer works too: pointing and clicking, and holding the button on an app for its options.
 
@@ -47,6 +48,14 @@ The **Inputs** button lists HDMI inputs by the names LG shows, with what is conn
 switches to the input.
 
 ![Inputs menu](screenshots/inputs.jpg)
+
+## Running apps
+
+On LG's own Home the second **Back** opens the Recents panel; with CleanYourTV as Home it opens the **Running apps** menu.
+It lists the apps that are open right now (hidden ones included, but never Home and never CleanYourTV's own apps), with
+**Close all** as the last row. OK closes an app and its row goes at once; the app also leaves LG's recents, as LG's own
+panel does. Back leaves the menu, and so does leaving Home, so the list is never out of date. An older service (before
+this feature) shows a "could not read" message instead.
 
 ## Icons
 
