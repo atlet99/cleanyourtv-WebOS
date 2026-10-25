@@ -380,6 +380,23 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
       'bootstrap rewrites the picker window type the same way as the notification app');
   }
 
+  // 10. spacing is pure CSS: the flexgap runtime shim is gone (row jitter on webOS 5/6, issue #5)
+  {
+    ok(!fs.existsSync(path.join(root, 'shared', 'flexgap.js')) && !/FLEXGAP|flexgap/.test(fs.readFileSync(path.join(root, 'ipk', 'build.py'), 'utf8')),
+      'the flexgap shim and its build injection are removed');
+    for (const file of ['app/index.html', 'manager/app/index.html', 'picker/app/index.html', 'notify/app/index.html']) {
+      const page = fs.readFileSync(path.join(root, file), 'utf8');
+      ok(!/flexgap|data-fg/.test(page), file + ': no flexgap markers');
+      const style = /<style>([\s\S]*?)<\/style>/.exec(page)[1], offenders = [];
+      const re = /([^{}]+)\{([^{}]*)\}/g; let m;
+      while ((m = re.exec(style))) if (/[;\{]\s*gap:/.test(m[2]) && !/display:grid/.test(m[2])) offenders.push(m[1].trim());
+      ok(offenders.length === 0,
+        file + ': flex containers carry no gap (the native #grid gap is exempt)');
+    }
+    ok(fs.readFileSync(path.join(root, 'app', 'index.html'), 'utf8').indexOf('#dock>*+*{margin-left:var(--dock-gap)}') >= 0,
+      'theme-driven gaps are applied as sibling margins in CSS');
+  }
+
   for (const check of ['security-check.js', 'i18n-check.js']) {
     const result = cp.spawnSync(process.execPath, [path.join(root, 'tools', check)], { encoding: 'utf8' });
     console.log(result.stdout || ''); if (result.stderr) console.error(result.stderr);
