@@ -11,6 +11,11 @@
 
 ## How the launcher becomes Home
 
+The IPK stores the root payload under `com.cleanyourtv.manager/root/` inside the manager application's resources.
+It does not register `com.cleanyourtv.manager.service` as a Luna service: the HTTP daemon is launched by the boot hook,
+not by LS2. `/media/developer/cleanyourtv` remains the writable runtime/state directory.
+See [Transition from old packages](../install.md#transition-from-162-and-earlier) for the one-time handoff from releases up to 1.6.2.
+
 1. `10-cleanyourtv-home` runs at boot and starts the service.
 2. `stage-home.sh` builds a directory holding the launcher plus an `appinfo.json` derived from this TV's own stock Home (saved in
    `backup/home-appinfo.orig.json` the first time), switched to the web type.

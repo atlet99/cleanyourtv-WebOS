@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build the release files into dist/:
-  com.cleanyourtv.manager_<version>_all.ipk (+ .sha256)   the package: manager app, picker app, notify app, service
+  com.cleanyourtv.manager_<version>_all.ipk (+ .sha256)   manager/picker/notify apps and the manager's root-daemon payload
   frontend-<version>.tgz (+ .sha256)                      the launcher alone, installed by the manager app
 Uses @atlet99/webos-packager-plugin/core 2.2.0 via Node.js (NODE_PATH points at the isolated tooling installation).
 Run from anywhere: python3 ipk/build.py"""
@@ -10,7 +10,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, 'dist')
 P = lambda *a: os.path.join(ROOT, *a)
 PKG = 'com.cleanyourtv.manager'
-SERVICE = PKG + '.service'
 PUBLIC_KEY = os.environ.get('CYTV_RELEASE_PUBLIC_KEY', P('release-public.pem'))
 SIGNING_KEY = os.environ.get('CYTV_SIGNING_KEY', '')
 if SIGNING_KEY and not os.path.isfile(PUBLIC_KEY):
@@ -116,7 +115,8 @@ for app_id, src in (('com.cleanyourtv.manager', 'manager/app'), ('com.cleanyourt
                 o = json.loads(body); o['version'] = version; body = json.dumps(o).encode()
             add(data, '.' + d + '/' + rel, body)
 add(data, './usr/palm/applications/com.cleanyourtv.manager/qrcode.js', open(P('third-party', 'qrcode-generator', 'qrcode.js'), 'rb').read())   # QR code for sharing the log
-s = '.' + '/usr/palm/services/' + SERVICE
+# This is an init.d-launched HTTP daemon, not a Luna service. App resources must not populate packageinfo.services.
+s = './usr/palm/applications/' + PKG + '/root'
 add(data, s + '/bootstrap.sh', open(P('scripts', 'bootstrap.sh'), 'rb').read(), 0o755)
 add_dir(data, s + '/helper', P('helper'))
 add(data, s + '/helper/i18n.js', open(P('shared', 'i18n.js'), 'rb').read())

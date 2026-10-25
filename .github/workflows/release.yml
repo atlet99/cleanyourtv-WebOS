@@ -83,3 +83,14 @@ jobs:
         env:
           TOOLING_DIRECTORY: ${{ steps.packager.outputs.directory }}
         run: rm -rf -- "$TOOLING_DIRECTORY"
+  pages:
+    name: Update documentation and HBC feed
+    needs: release
+    if: github.ref == 'refs/heads/main' && needs.release.result == 'success'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/docs.yml
+    secrets:
+      CYTV_RELEASE_PUBLIC_KEY_PEM: ${{ secrets.CYTV_RELEASE_PUBLIC_KEY_PEM }}

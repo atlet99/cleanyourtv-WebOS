@@ -1,5 +1,5 @@
 #!/bin/sh
-# CleanYourTV for LG webOS: installs the manager app only. Run ON the TV, as root (see the README and https://lasharor.github.io/cleanyourtv-WebOS/install/). It downloads the latest
+# CleanYourTV for LG webOS: installs the manager app only. Run ON the TV, as root (see the README and https://atlet99.github.io/cleanyourtv-WebOS/install/). It downloads the latest
 # release package (an .ipk), checks its SHA-256 and installs it. The setup itself (replacing LG's Home, the Input key,
 # the debloat) is done afterwards in the CleanYourTV app on the TV: open it and choose "Set up now".
 #
@@ -12,6 +12,7 @@
 main() {
   REPO="${CYTV_REPO:-atlet99/cleanyourtv-WebOS}"
   ID=com.cleanyourtv.manager
+  PAYLOAD=/media/developer/apps/usr/palm/applications/$ID/root
   export PATH=/usr/bin:/usr/sbin:/bin:/sbin:$PATH
   say() { echo "[cleanyourtv] $*"; }
   # Never follow an HTTPS release asset redirect to plain HTTP.
@@ -62,18 +63,18 @@ main() {
     luna-send -n 1 -w 30000 -f luna://com.webos.appInstallService/dev/install "{\"id\":\"$ID\",\"ipkUrl\":\"$T/install.ipk\",\"subscribe\":false}" </dev/null >/dev/null 2>&1
     for i in 1 2 3 4 5 6 7 8; do
       sleep 3
-      [ -f /media/developer/apps/usr/palm/services/$ID.service/bootstrap.sh ] && luna-send -n 1 -w 5000 -f luna://com.webos.applicationManager/getAppInfo "{\"id\":\"$ID\"}" </dev/null 2>/dev/null | grep -q '"returnValue": true' && { ok=1; break; }
+      [ -f "$PAYLOAD/bootstrap.sh" ] && luna-send -n 1 -w 5000 -f luna://com.webos.applicationManager/getAppInfo "{\"id\":\"$ID\"}" </dev/null 2>/dev/null | grep -q '"returnValue": true' && { ok=1; break; }
     done
     [ $ok = 1 ] && break
     n=$((n+1))
   done
   rm -f "$T/install.ipk"
-  [ $ok = 1 ] || die "the package did not install (see Troubleshooting in the documentation: https://lasharor.github.io/cleanyourtv-WebOS/troubleshooting/)"
+  [ $ok = 1 ] || die "the package did not install (see Troubleshooting in the documentation: https://atlet99.github.io/cleanyourtv-WebOS/troubleshooting/)"
   if [ -n "$SLUG" ]; then mkdir -p /media/developer/cleanyourtv && echo "test-$SLUG" > /media/developer/cleanyourtv/channel; say "the manager app now follows the test builds of $CYTV_BRANCH (Update channel in the manager switches back to the stable releases)."; fi
   say "the CleanYourTV app is installed."
   if [ -f /media/developer/cleanyourtv/helper.js ] && [ -e /var/lib/webosbrew/init.d/10-cleanyourtv-home ]; then
     # already set up: this is an update, so bring the running service to the new version
-    sh /media/developer/apps/usr/palm/services/$ID.service/bootstrap.sh update "$(sed -n "s/^const VERSION = '\(.*\)';/\1/p" /media/developer/apps/usr/palm/services/$ID.service/helper/helper.js | head -1)"
+    sh "$PAYLOAD/bootstrap.sh" update "$(sed -n "s/^const VERSION = '\(.*\)';/\1/p" "$PAYLOAD/helper/helper.js" | head -1)"
   else
     say "Next, on the TV: open CleanYourTV in the app list and choose 'Set up now'."
   fi

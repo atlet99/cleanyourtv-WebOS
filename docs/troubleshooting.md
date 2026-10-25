@@ -1,5 +1,9 @@
 # Troubleshooting
 
+- **HBC install error `-5: Service id should start with app id`.** Version 1.6.2 and earlier incorrectly registered a root
+  payload as a Luna service without its descriptor. Install the corrected release from the updated feed and follow the
+  [transition instructions](install.md#transition-from-162-and-earlier) if the TV was already configured.
+
 - **Black screen after switching or rebooting.** Wait a minute; if it stays black, restart the TV. If the new Home does not come
   up, the setup removes the boot scripts and restarts the TV with LG's Home by itself.
 - **The Home button opens LG's full-screen Home, not CleanYourTV.** Some TVs have a Home Style setting. Set TV Settings > General >

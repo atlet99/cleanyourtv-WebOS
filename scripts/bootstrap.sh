@@ -1,5 +1,5 @@
 #!/bin/sh
-# CleanYourTV service bootstrap. Runs as root on the TV, from the service folder of the installed package:
+# CleanYourTV service bootstrap. Runs as root on the TV, from the manager app's root/ payload directory:
 #   sh bootstrap.sh install [--no-debloat] [--no-input-key] [--no-start] [--no-verify] [--force]
 #   sh bootstrap.sh update <version>      after the manager installed a newer package (restarts the service, undoes it if it fails)
 # It copies the service files to /media/developer/cleanyourtv, installs the boot scripts, replaces LG's Home and

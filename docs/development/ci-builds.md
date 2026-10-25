@@ -49,6 +49,11 @@ a conflicting existing tag or manual draft reserves that version and causes the 
 Production publication is never tested by contacting GitHub from the regression suite: its API is faked there.
 
 The release job exposes `new_release_published` and `new_release_version` for future downstream jobs.
+After a successful main release job, it explicitly calls the Documentation workflow to rebuild both the site and `/repo/`.
+This does not rely on the `release` event, which GitHub suppresses for releases created with `GITHUB_TOKEN`.
+Pages builds/deployments are serialised together; the feed is always generated after the clean documentation build.
+Downloads use an explicit latest-release tag, and API/download/verification failures stop deployment instead of removing the feed.
+Only the public verification key is passed to the called Pages workflow, never the private signing key.
 
 ## Signing setup
 
@@ -139,6 +144,8 @@ rm -rf "$tooling"
 `ipk/build.py` prepares assets/launcher/signatures; `ipk/pack.cjs` delegates the multi-app IPK container to the library.
 The generic Action and legacy `ipk/build-ipk.py` command use the same core. Explicit modes preserve executables as `0755`, libraries
 as `0644`, and fixed nonzero timestamps keep the packages reproducible. The generic Action also honours `SOURCE_DATE_EPOCH`.
+The CleanYourTV root payload is manager-app data (`com.cleanyourtv.manager/root/`), so `packageinfo.services` stays empty.
+Package checks and feed generation validate the actual IPK metadata. A checksum alone cannot establish installability.
 
 References: [GitHub CLI release creation](https://cli.github.com/manual/gh_release_create),
 [plugin 2.2.0](https://www.npmjs.com/package/@atlet99/webos-packager-plugin/v/2.2.0),

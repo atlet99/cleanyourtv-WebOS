@@ -37,7 +37,7 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:var(--night);col
   <div id="sharemsg"></div><div id="shareurl"></div><div id="shareclose">Close</div>
   <div id="qrbox"><canvas id="qr"></canvas></div></div>
 <script>
-var kFlow='input', kText='', kRows=[], kTimer=0, upd=null, checkedOffline=false, forceOffer=false, API='http://127.0.0.1:8765', SVC='/media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service';
+var kFlow='input', kText='', kRows=[], kTimer=0, upd=null, checkedOffline=false, forceOffer=false, API='http://127.0.0.1:8765', SVC='/media/developer/apps/usr/palm/applications/com.cleanyourtv.manager/root';
 var napi=null, lv=null, th=null, vo=null, mdl=[], agl=[], tst=null, shareMode='log', pairBase=0,  idxStack=[], setupIdx=0, updIdx=0, st=null, rows=[], idx=0, view='main', pending=null, pollT=0, setup={debloat:true,inputKey:true}, offline=false, busyMsg='';
 function $(i){return document.getElementById(i)}
 function t(s){return CYTV_I18N.t(s)}

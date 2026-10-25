@@ -12,7 +12,7 @@
             window.CYTV.token = token; resolve(token);
           } catch (error) { pending = null; reject(error); }
         };
-        bridge.call('luna://org.webosbrew.hbchannel.service/exec', JSON.stringify({ command: 'node /media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service/helper/security.js token' }));
+        bridge.call('luna://org.webosbrew.hbchannel.service/exec', JSON.stringify({ command: 'node /media/developer/apps/usr/palm/applications/com.cleanyourtv.manager/root/helper/security.js token' }));
       } catch (error) { pending = null; reject(error); }
     });
     pending.catch(function () { pending = null; });

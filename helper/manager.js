@@ -4,7 +4,7 @@ const fs = require('fs'), path = require('path'), cp = require('child_process'),
 const nc = require('./netcompat'), { URL, URLSearchParams } = nc;
 const signatures = require('./release');
 const D = process.env.CYTV_DIR || '/media/developer/cleanyourtv';   // the environment variables are for tools/node8-check.js
-const SERVICE_DIR = process.env.CYTV_SERVICE_DIR || '/media/developer/apps/usr/palm/services/com.cleanyourtv.manager.service';
+const SERVICE_DIR = process.env.CYTV_SERVICE_DIR || '/media/developer/apps/usr/palm/applications/com.cleanyourtv.manager/root';
 const apiBase = () => process.env.CYTV_API || 'https://api.github.com';
 const DEFAULT_REPO = 'atlet99/cleanyourtv-WebOS';
 const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbin:' + (process.env.PATH || '') });
