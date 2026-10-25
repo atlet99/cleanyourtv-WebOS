@@ -9,6 +9,7 @@ const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbi
 
 function procs() {
   const out = [];
+  if (!fs.existsSync('/proc')) return out;   // not a webOS machine (dev/CI): no processes to hook, status just reports unhooked
   for (const p of fs.readdirSync('/proc')) {
     if (!/^\d+$/.test(p)) continue;
     try { const n = fs.readFileSync('/proc/' + p + '/comm', 'utf8').trim(); if (TARGETS.includes(n)) out.push({ pid: p, name: n }); } catch (_) {}

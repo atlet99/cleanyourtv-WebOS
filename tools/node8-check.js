@@ -397,6 +397,65 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
       'theme-driven gaps are applied as sibling margins in CSS');
   }
 
+  // 11. options and learned keys survive an update: boot the real service over a seeded state (issue #6)
+  {
+    fs.writeFileSync(path.join(process.env.CYTV_DIR, 'config.json'), JSON.stringify({
+      options: { inputKey: false, debloat: true, liveTv: false },
+      keys: { input: '55', home: '', voice: '', guide: '88', learned: true },
+    }));
+    fs.writeFileSync(path.join(process.env.CYTV_DIR, 'channel'), 'test-main');
+    ok(!('options' in JSON.parse(fs.readFileSync(path.join(root, 'config.example.json'), 'utf8'))) && !('keys' in JSON.parse(fs.readFileSync(path.join(root, 'config.example.json'), 'utf8'))),
+      'a fresh config.example.json carries no options/keys that could shadow the stored ones');
+    ok(/cp \$S\/config\.example\.json \$D\/config\.json/.test(fs.readFileSync(path.join(root, 'scripts', 'bootstrap.sh'), 'utf8')),
+      'bootstrap only copies the example config when none exists: an update keeps the stored one');
+    const svcToken = require(path.join(helper, 'security')).token();
+    const svcPort = 18765 + (process.pid % 1000);   // never touch a real service on 8765
+    const call2 = (method, url, body) => new Promise((resolve, reject) => {
+      const rq = http.request({ host: '127.0.0.1', port: svcPort, method, path: url, headers: { 'x-cytv-token': svcToken, 'content-type': 'application/json' } },
+        r => { let b = ''; r.on('data', c => b += c); r.on('end', () => resolve({ status: r.statusCode, j: b[0] === '{' ? JSON.parse(b) : b })); });
+      rq.on('error', reject); rq.end(body ? JSON.stringify(body) : undefined);
+    });
+    const errs = [], svc = cp.spawn(process.execPath, [path.join(helper, 'helper.js')], { env: Object.assign({}, process.env, { CYTV_PORT: String(svcPort) }), stdio: ['ignore', 'ignore', 'pipe'] });
+    svc.stderr.on('data', c => errs.push(String(c)));
+    for (let i = 0; i < 40; i++) { try { await call2('GET', '/api/version'); break; } catch (_) { await new Promise(r => setTimeout(r, 250)); } }
+    const st = await call2('GET', '/api/manager/status');
+    ok(st.j.options.inputKey === false && st.j.options.debloat === true && st.j.options.liveTv === false,
+      'status reports the stored options after the update, defaults did not shadow them');
+    ok(st.j.keys.input === '55' && st.j.keys.guide === '88' && st.j.keys.learned === true, 'status reports the stored learned keys');
+    ok(st.j.channel === 'test-main', 'the update channel survives');
+    ok(st.j.inputhook && st.j.inputhook.hook && st.j.inputhook.hook.attached === false && st.j.options.inputKey === false,
+      'the capability (hook attached) is exposed separately from the stored option');
+    const saved = await call2('POST', '/api/config', { dock: ['netflix'], clock: '24' });
+    const after = JSON.parse(fs.readFileSync(path.join(process.env.CYTV_DIR, 'config.json'), 'utf8'));
+    ok(saved.status === 200 && after.dock && after.dock[0] === 'netflix' && after.options.inputKey === false && after.keys.input === '55',
+      'a launcher customise saves the dock and preserves options and keys');
+    const opt = await call2('POST', '/api/manager/options', { liveTv: true });
+    const after2 = JSON.parse(fs.readFileSync(path.join(process.env.CYTV_DIR, 'config.json'), 'utf8'));
+    ok(opt.j.options.inputKey === false && opt.j.options.liveTv === true && after2.options.debloat === true && after2.keys.learned === true,
+      'an option change writes only the changed option; debloat (and its scripts) stay untouched');
+    svc.kill();
+    ok(!/manager module failed|security/.test(errs.join('')), 'the service started cleanly over the seeded state');
+    // the bootstrap flag semantics that keep an update from resetting the stored choice (issue #6)
+    {
+      const jt2 = path.join(root, 'scripts', 'jtool.js'), cfg2 = path.join(tmp, 'opts.json');
+      const seed = () => fs.writeFileSync(cfg2, JSON.stringify({ options: { inputKey: false, debloat: true, liveTv: false }, keys: { input: '55' } }));
+      seed();
+      cp.spawnSync(process.execPath, [jt2, 'options', cfg2, '', '']);   // an update run passes no flags
+      let c2 = JSON.parse(fs.readFileSync(cfg2, 'utf8'));
+      ok(c2.options.inputKey === false && c2.options.debloat === true && c2.options.liveTv === false && c2.keys.input === '55',
+        'bootstrap option defaults on an update leave the stored choice and sibling keys alone');
+      cp.spawnSync(process.execPath, [jt2, 'options', cfg2, '', '1']);   // an explicit setup flag
+      c2 = JSON.parse(fs.readFileSync(cfg2, 'utf8'));
+      ok(c2.options.inputKey === true && c2.options.liveTv === false && c2.keys.input === '55',
+        'an explicit setup flag overrides exactly its own option');
+      fs.writeFileSync(cfg2, JSON.stringify({}));
+      cp.spawnSync(process.execPath, [jt2, 'options', cfg2, '', '']);
+      c2 = JSON.parse(fs.readFileSync(cfg2, 'utf8'));
+      ok(c2.options.inputKey === true && c2.options.debloat === true && c2.keys === undefined,
+        'a fresh config gets the documented defaults and nothing else');
+    }
+  }
+
   for (const check of ['security-check.js', 'i18n-check.js']) {
     const result = cp.spawnSync(process.execPath, [path.join(root, 'tools', check)], { encoding: 'utf8' });
     console.log(result.stdout || ''); if (result.stderr) console.error(result.stderr);

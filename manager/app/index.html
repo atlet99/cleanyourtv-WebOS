@@ -405,7 +405,7 @@ function kLearn(name){
     (function poll(){kTimer=setTimeout(function(){api('/api/manager/learn-state').then(function(l){
       if(view!=='keys')return;
       if(l.state==='got'){kShow(kName(name)+' key learned: code '+l.code+'.',[{label:name==='input'?'Continue to the test':'Close',fn:function(){api('/api/manager/status').then(function(s){st=s;if(name==='input')kStep('test');else closeKeys()})}}]);return}
-      if(l.state==='unsupported'){api('/api/manager/options',{inputKey:false});kShow('The hook did not attach on this firmware, so keys cannot be learned. The Input key stays with LG\u2019s picker.\nUse Share log to report this.',[{label:'Close',fn:closeKeys}]);return}
+      if(l.state==='unsupported'){kShow('The hook did not attach on this firmware, so keys cannot be learned. The Input key stays with LG\u2019s picker.\nUse Share log to report this.',[{label:'Close',fn:closeKeys}]);return}
       if(l.state==='timeout'){kShow('Nothing was pressed.',[{label:'Try again',fn:function(){kLearn(name)}},{label:name==='input'?'Skip':'Close',fn:function(){if(name==='input')kStep('test');else closeKeys()}}]);return}
       poll()},function(){poll()})},500)})()})}
 function kTest(){
