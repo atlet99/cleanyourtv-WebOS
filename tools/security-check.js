@@ -36,7 +36,9 @@ const security = require('../helper/security');
   assert.strictEqual(await call('https://example.invalid', secret), 403);
   assert.strictEqual(calls, 0);
   assert.strictEqual(await call('file://com.cleanyourtv.manager-webos', secret), 200);
-  assert.strictEqual(calls, 1);
+  assert.strictEqual(await call('file://', secret), 200);   // Chromium 53 (webOS 5) serialises local origins this way
+  assert.strictEqual(await call('file:///media/x/index.html', secret), 200);
+  assert.strictEqual(calls, 3);
   console.log('ok   opaque origins cannot call root API without a capability; local app token works');
   let sent, bridges = 0;
   const browser = { window: {}, setTimeout, clearTimeout,
@@ -66,6 +68,15 @@ const security = require('../helper/security');
   fs.unlinkSync(tokenFile); security.token();
   fs.rmdirSync(run); fs.symlinkSync(temp, run); assert.throws(() => security.runtime()); fs.unlinkSync(run);
   console.log('ok   private token/runtime paths reject symlinks');
+  // An install that lost its file modes (0777 tree) is tightened in place instead of refusing to start forever.
+  fs.chmodSync(tokenFile, 0o666); fs.chmodSync(temp, 0o777);
+  const healed = security.token();
+  assert.strictEqual(security.token(), healed);
+  assert.strictEqual(fs.statSync(tokenFile).mode & 0o777, 0o600);
+  assert.strictEqual(fs.statSync(temp).mode & 0o777, 0o755);
+  fs.chmodSync(temp, 0o777); security.runtime(); fs.chmodSync(run, 0o777); security.runtime();
+  assert.strictEqual(fs.statSync(run).mode & 0o777, 0o700);
+  console.log('ok   an 0777 install is tightened to 0755/0600/0700 and keeps working');
 
   function openssl(args) { cp.execFileSync('openssl', args, { stdio: ['ignore', 'pipe', 'pipe'] }); }
   const privateKey = path.join(temp, 'private.pem'), publicKey = path.join(temp, 'public.pem');

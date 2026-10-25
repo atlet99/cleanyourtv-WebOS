@@ -131,7 +131,7 @@ mkdir -p $D/inputhook && cp $S/inputhook/* $D/inputhook/ && chmod 755 $D/inputho
 chmod +x $D/*.sh $D/10-cleanyourtv-home $D/15-cleanyourtv-debloat
 # root runs these files at boot and from the Input-key hook: nobody else may write them (the dev partition is world-writable)
 chmod -R go-w $D $S 2>/dev/null
-mkdir -p $D/live; chmod 700 $D/live 2>/dev/null; chmod 600 $D/config.json $D/usage.json $D/live/* 2>/dev/null
+mkdir -p $D/live; chmod 700 $D/live 2>/dev/null; chmod 600 $D/config.json $D/usage.json $D/api-token $D/live/* 2>/dev/null
 [ -f $D/config.json ] || cp $S/config.example.json $D/config.json
 [ -f $D/compat.json ] || cp $S/compat.json $D/compat.json
 

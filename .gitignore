@@ -1,4 +1,5 @@
 .impeccable/
+.servers-list
 dist/
 site/
 .venv/

@@ -6,6 +6,7 @@ the output of **Share log** (see [Troubleshooting](troubleshooting.md#reporting-
 | TV | Firmware | webOS (SDK) | Status |
 |---|---|---|---|
 | OLED65G26LA | 33.23.05 | webOS 25 (10.2.2) | **Tested.** The maintainer's TV; everything in these pages was checked on it. |
+| 65UN73506LB | 04.64.00 | webOS 5.6.2 (Node.js 8.12) | **Tested.** The stock Home is the native kind; the replacement rewrites it to a web app on the fly. Service, Home replacement and the Input key work. |
 | Two models | 23.25.55 | | Reported working. |
 | OLED65C54LA | 43.21.77 | SDK 11.2.0 | Reported in [issue #3](https://github.com/lasharor/cleanyourtv-WebOS/issues/3): runs; app icons were drawn badly. A fix is available as a test build. |
 | 55UN7200PTF | 04.64.00 | webOS 5.6.2 (Node.js 8.12) | Reported in [issue #4](https://github.com/lasharor/cleanyourtv-WebOS/issues/4): works with the Home Style set to Basic and a few fixes that are available as a test build. |

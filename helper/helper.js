@@ -97,8 +97,9 @@ http.createServer(async (req, res) => {
   // Origin is defence in depth: sandboxed web pages can also send "null". Every request needs the local capability.
   let origin = req.headers.origin;
   const rawOrigin = origin;
-  // webOS 6 sends "file://<appId>-webos" for local apps instead of "null": accept that for our own apps and the Home slot only
-  if (/^file:\/\/(com\.webos\.app\.home|com\.cleanyourtv\.(manager|picker|notify|live))-webos$/.test(origin || '')) origin = 'null';
+  // webOS 6 sends "file://<appId>-webos" for local apps, older webOS serialises the origin as "file://" or
+  // "file:///<path>" (Chromium 53). Local file origins are one trust class: every request still needs the token.
+  if (/^file:\/\//.test(origin || '')) origin = 'null';
   if (origin !== undefined && origin !== 'null') { res.writeHead(403, { 'content-type': 'application/json' }); return res.end('{"error":"origin not allowed"}'); }
   // Chromium 79 (webOS 6) compares the answer with its own serialisation of a file origin, so for those origins echoing fails CORS: answer * there.
   // Only origins accepted above get this far.

@@ -1,9 +1,15 @@
 #!/bin/sh
 # Reload the page of Home. Where the Home renderer can be found (webOS 7 and newer) it is killed and Home is launched
 # again. On webOS 6 (Node 8) WebAppMgr keeps the replaced page alive and a relaunch only brings the old page back, so
-# there webapp-mgr is restarted. Other versions are never restarted this way.
+# there webapp-mgr is restarted. On webOS 5 the stock Home is a native binary that sam holds in a snapshot and that
+# even root cannot kill; while that process lives, sam never reads the mounted app directory, so sam itself must be
+# restarted (the screen blinks once). Other versions are never restarted this way.
 export PATH=/usr/bin:/usr/sbin:/bin:/sbin:$PATH
-if pgrep -f "[a]pp-id=com.webos.app.home" >/dev/null; then
+if pgrep -f "^/usr/bin/com.webos.app.home" >/dev/null; then
+  systemctl restart sam
+  for i in $(seq 1 30); do systemctl is-active sam >/dev/null && break; sleep 2; done
+  sleep 8
+elif pgrep -f "[a]pp-id=com.webos.app.home" >/dev/null; then
   pkill -f "[a]pp-id=com.webos.app.home"; sleep 2
 else
   nm=$(node -p 'parseInt(process.versions.node, 10)' 2>/dev/null)

@@ -1,13 +1,23 @@
 // Local apps obtain this capability through the Homebrew service, never through HTTP.
 const fs = require('fs'), crypto = require('crypto'), path = require('path');
 const DIR = process.env.CYTV_DIR || '/media/developer/cleanyourtv';
+// File modes can be lost on the way to the TV (a Samba copy, some extractors leave the tree 0777), which used to
+// keep the service dead forever, because a fresh install never rewrites an existing token file. Our own root-owned
+// directory and files are tightened in place instead; symlinks, hard links and foreign-owned paths stay refused.
+function tighten(st, p, mode) {
+  if (process.getuid && st.uid !== process.getuid()) return st;
+  try { fs.chmodSync(p, mode); st = fs.lstatSync(p); } catch (_) {}
+  return st;
+}
 function token() {
   try { fs.mkdirSync(DIR, 0o755); } catch (e) { if (e.code !== 'EEXIST') throw e; }
-  const dir = fs.lstatSync(DIR);
+  let dir = fs.lstatSync(DIR);
+  if (dir.isDirectory() && (dir.mode & 0o022)) dir = tighten(dir, DIR, 0o755);
   if (!dir.isDirectory() || (dir.mode & 0o022) || (process.getuid && dir.uid !== process.getuid())) throw new Error('unsafe service directory');
   const file = path.join(DIR, 'api-token');
   try { fs.writeFileSync(file, crypto.randomBytes(32).toString('hex'), { flag: 'wx', mode: 0o600 }); } catch (e) { if (e.code !== 'EEXIST') throw e; }
-  const st = fs.lstatSync(file);
+  let st = fs.lstatSync(file);
+  if (st.isFile() && st.nlink === 1 && (st.mode & 0o077)) st = tighten(st, file, 0o600);
   if (!st.isFile() || st.nlink !== 1 || (st.mode & 0o077) || st.uid !== dir.uid) throw new Error('unsafe API token file');
   const value = fs.readFileSync(file, 'utf8');
   if (!/^[0-9a-f]{64}$/.test(value)) throw new Error('invalid API token');
@@ -25,7 +35,8 @@ function runtime() {
   token();
   const dir = path.join(DIR, 'run');
   try { fs.mkdirSync(dir, 0o700); } catch (e) { if (e.code !== 'EEXIST') throw e; }
-  const st = fs.lstatSync(dir);
+  let st = fs.lstatSync(dir);
+  if (st.isDirectory() && (st.mode & 0o077)) st = tighten(st, dir, 0o700);
   if (!st.isDirectory() || (st.mode & 0o077) || (process.getuid && st.uid !== process.getuid())) throw new Error('unsafe runtime directory');
   return dir;
 }
