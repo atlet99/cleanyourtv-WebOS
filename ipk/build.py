@@ -30,12 +30,9 @@ if release_version and not re.fullmatch(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d
     sys.exit('CYTV_RELEASE_VERSION must be a stable x.y.z version')
 version, fe = release_version or source_version, release_version or source_fe
 
-FLEXGAP = open(os.path.join(ROOT, 'shared', 'flexgap.js'), 'rb').read()
-def page(body):   # every HTML page gets the flex-gap script for webOS 6 (see shared/flexgap.js)
-    body = re.sub(rb'<script src="(?:\.\./)+shared/(api|i18n)\.js"></script>',
+def page(body):   # inlines the shared scripts; spacing is pure CSS (see docs: no runtime layout fixes)
+    return re.sub(rb'<script src="(?:\.\./)+shared/(api|i18n)\.js"></script>',
                   lambda m: b'<script>' + open(P('shared', m[1].decode() + '.js'), 'rb').read() + b'</script>', body)
-    i = body.rindex(b'</body>')
-    return body[:i] + b'<script>' + FLEXGAP + b'</script>\n' + body[i:]
 
 def frontend_asset(rel, body):
     if release_version and rel == 'version.json':

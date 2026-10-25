@@ -36,7 +36,8 @@ Nothing is written under `/usr`: the mount disappears at reboot. `DISABLE` in `/
 webOS 5 and 6 ship Node.js 8, and webOS 6 has Chromium 79.
 
 - `helper/netcompat.js` supplies `URL`, `URLSearchParams`, `crypto.randomInt`, `mkdir -p` and the `http(s).get(url, options)` form.
-- `shared/flexgap.js` is added to every page by the build; where flex `gap` is ignored it applies the spacing as margins.
+- Spacing between items is plain CSS (`> * + *` sibling margins); there is no runtime layout script, so lists never
+  repaint with a shift on engines where flex `gap` is ignored (webOS 5/6). The app grid uses CSS grid with a native `gap`.
 - The service accepts the `file://<appId>-webos` origin that webOS 6 apps send, for our own apps and the Home slot only.
 - `scripts/reload-home.sh` restarts `webapp-mgr` on webOS 6, where a relaunch alone keeps the old page.
 

@@ -57,6 +57,7 @@ with tempfile.TemporaryDirectory(prefix='cytv-package-') as temp:
                     html = archive.extractfile(page).read()
                     assert b'root.CYTV_I18N' in html and b'window.CYTV' in html
                     assert b'shared/api.js' not in html and b'shared/i18n.js' not in html
+                    assert b'flexgap' not in html and b'data-fg' not in html
                     assert 'Телеканалы'.encode() in html
                 if asset.suffix == '.ipk':
                     assert all(m.mtime == 1761000000 and m.uid == 0 and m.gid == 0 for m in archive.getmembers())
