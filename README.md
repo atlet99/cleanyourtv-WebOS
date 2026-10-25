@@ -38,7 +38,9 @@ sets up, updates and removes everything.
 
 ## Quick start
 
-**Packages:** [Releases](https://github.com/atlet99/cleanyourtv-WebOS/releases) contains the stable signed IPKs.
+**Packages:** [Releases](https://github.com/atlet99/cleanyourtv-WebOS/releases) contains the stable signed IPKs, and the
+Homebrew Channel repository feed serves the latest one — in the channel's **Manage feeds** add
+`https://atlet99.github.io/cleanyourtv-WebOS/repo/apps.json` and install **CleanYourTV** straight from the mug.
 Pull requests run linters, tests and preview builds; checked application changes merged into `main` automatically receive a version, tag and release.
 See [CI and release setup](docs/development/ci-builds.md) for signing keys, version rules and preview downloads.
 

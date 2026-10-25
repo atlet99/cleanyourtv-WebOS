@@ -9,7 +9,7 @@ For the first signed version, update the service package first; see [Migration](
 - A launcher that does not start is replaced by the previous one, and a service that does not start by the previous files.
 - **Go back to launcher** returns to a compatible saved launcher after an update. Pre-authentication launchers are not offered.
 - Before the setup, the app offers a newer package by itself.
-- Running the [install command](install.md#1-install-the-manager-app) again also updates.
+- Running the [install command](install.md#1-install-the-manager-app-over-ssh) again also updates.
 
 ## Update channel
 

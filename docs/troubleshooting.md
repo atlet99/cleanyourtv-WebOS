@@ -5,7 +5,7 @@
 - **The Home button opens LG's full-screen Home, not CleanYourTV.** Some TVs have a Home Style setting. Set TV Settings > General >
   Home Settings > Home Style to Basic.
 - **An app is missing from the grid.** Check **Hidden apps** in Customise. Apps without a launch icon are not listed.
-- **After a firmware update removed root.** Re-root, then run the [install command](install.md#1-install-the-manager-app) and the setup again.
+- **After a firmware update removed root.** Re-root, then run the [install command](install.md#1-install-the-manager-app-over-ssh) and the setup again.
 - **The Input key opens LG's picker.** Check the Input key switch in the manager app and run **Learn the Input key**.
 - **The UI freezes a few seconds after start.** Older versions kept the Inputs picker running hidden, and on some firmware
   a hidden overlay app keeps the remote. Update to the current release: the picker now runs only while the Input list is
