@@ -672,7 +672,7 @@ var LIVE=(function(){
     spinT=setTimeout(function(){if(v===video&&!started&&!failed&&!(v.readyState>=3&&!v.paused))onError()},START_MS)}
   var WHY={refused:'The server refused the stream: it may be blocked in your country or need special request headers.',gone:'The stream was not found (404): the channel is offline or its address has changed.',
     server:'The stream server reported an error.',notvideo:'The address answers with a web page, not a video.',drm:'This stream is protected by DRM and cannot be played here.',
-    unreachable:'The stream server cannot be reached.',slow:'The stream is too slow to start.',ok:'The stream answers, but the TV could not play it: probably a format it cannot decode.',unknown:'This channel is not available.'};
+    unreachable:'The stream server cannot be reached.',tls:'The stream server uses a certificate the TV will not accept.',slow:'The stream is too slow to start.',ok:'The stream answers, but the TV could not play it: probably a format it cannot decode.',unknown:'This channel is not available.'};
   function giveUp(){
     clearTimeout(spinT);clearTimeout(stallT);layer('lv-spin',false);layer('lv-tune',false);failed=true;
     var c=byNum[cur],g=gen;if(!c)return;

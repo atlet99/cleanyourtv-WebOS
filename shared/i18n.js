@@ -29,7 +29,7 @@
     'The stream was not found (404): the channel is offline or its address has changed.':'Поток не найден (HTTP 404). Канал отключён или его адрес изменился.',
     'The stream server reported an error.':'Ошибка на сервере трансляции.', 'The address answers with a web page, not a video.':'По этому адресу открывается веб-страница вместо видеопотока.',
     'This stream is protected by DRM and cannot be played here.':'Поток защищён DRM. Этот проигрыватель не поддерживает его воспроизведение.',
-    'The stream server cannot be reached.':'Не удалось подключиться к серверу трансляции.', 'The stream is too slow to start.':'Сервер слишком долго не начинает передачу видео.',
+    'The stream server cannot be reached.':'Не удалось подключиться к серверу трансляции.', 'The stream server uses a certificate the TV will not accept.':'Сервер трансляции использует сертификат, который телевизор не принимает.', 'The stream is too slow to start.':'Сервер слишком долго не начинает передачу видео.',
     'The stream answers, but the TV could not play it: probably a format it cannot decode.':'Поток доступен, но телевизор не может его воспроизвести. Вероятно, формат видео или звука не поддерживается.',
     'Apps':'Приложения', 'Your playlist':'Ваш плейлист', 'Nothing connected':'Нет подключения',
     'Can’t read the inputs. Live TV still works.':'Не удалось получить список входов. Телеканалы остаются доступны.',

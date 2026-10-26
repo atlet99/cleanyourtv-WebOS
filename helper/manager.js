@@ -12,7 +12,7 @@ const ENV = Object.assign({}, process.env, { PATH: '/usr/bin:/usr/sbin:/bin:/sbi
 const semver = v => String(v || '0').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
 function cmp(a, b) { const x = semver(a), y = semver(b); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0) ? 1 : -1; return 0; }
 const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) { return d; } };
-const sh = (cmd, ms) => new Promise(res => nc.execFile(cp, '/bin/sh', ['-c', cmd], { env: ENV, timeout: ms || 60000, maxBuffer: 8 << 20 }, (e, out, err) => res({ ok: !e, out: String(out || ''), err: String(err || '') })));
+const run = (file, args, ms, o) => new Promise(res => nc.execFile(cp, file, args, Object.assign({ env: ENV, timeout: ms || 60000, maxBuffer: 8 << 20 }, o), (e, out, err) => res({ ok: !e, out: String(out || ''), err: String(err || '') })));
 
 // GET a URL (follows redirects). Returns a Buffer, or with `file` streams to disk and resolves {sha256}.
 const allowHttp = () => { if (process.env.CYTV_API) return true; try { return !!JSON.parse(fs.readFileSync(D + '/config.json', 'utf8')).releasesUrl; } catch (_) { return false; } };   // a custom release source, for testing
@@ -123,11 +123,14 @@ function create(ctx) {
   }
 
   async function reloadHome() {
-    await sh('sh ' + D + '/reload-home.sh', 90000);   // knows the per-webOS way: renderer kill, webapp-mgr or sam restart
+    await run('/bin/sh', [D + '/reload-home.sh'], 90000);   // knows the per-webOS way: renderer kill, webapp-mgr or sam restart
     await luna('luna://com.webos.applicationManager/launch', { id: 'com.webos.app.home' });
   }
   async function swapIn(srcApp) {   // srcApp becomes D/app; the old one is kept as D/app.prev
-    await sh('rm -rf ' + D + '/app.prev && mv ' + D + '/app ' + D + '/app.prev && mv ' + srcApp + ' ' + D + '/app && sh ' + D + '/stage-home.sh');
+    await run('rm', ['-rf', D + '/app.prev']);
+    await run('mv', [D + '/app', D + '/app.prev']);
+    await run('mv', [srcApp, D + '/app']);
+    await run('/bin/sh', [D + '/stage-home.sh']);
   }
   async function waitFrontend(ver, ms) {
     const until = Date.now() + ms;
@@ -144,11 +147,11 @@ function create(ctx) {
       if (!release || release.frontend !== ver) throw new Error('launcher ' + ver + ' is not in the latest release');
       await download('frontend-' + ver + '.tgz', ver, T + '/f.tgz');
       setJob('working', 'Checking the download');
-      const lst = await sh('tar tzf ' + T + '/f.tgz');
+      const lst = await run('tar', ['tzf', T + '/f.tgz']);
       const names = lst.out.split('\n').filter(Boolean);
       if (!lst.ok || !names.length || names.some(n => n.startsWith('/') || n.split('/').includes('..') || !(n === 'app' || n.startsWith('app/'))))
         throw new Error('unexpected files in the download');
-      if (!(await sh('cd ' + T + ' && tar xzf f.tgz')).ok) throw new Error('could not unpack');
+      if (!(await run('tar', ['xzf', 'f.tgz'], 60000, { cwd: T })).ok) throw new Error('could not unpack');
       const nv = readJson(T + '/app/version.json', {});
       if (nv.version !== ver || !fs.existsSync(T + '/app/index.html')) throw new Error('the download is not launcher ' + ver);
       if (nv.apiVersion !== 3) throw new Error('this launcher does not support API authorization');
@@ -166,10 +169,14 @@ function create(ctx) {
       }
       setJob('done', 'Launcher ' + ver + ' installed');
     } catch (e) { setJob('error', String(e.message || e)); }
-    if (T) await sh('rm -rf ' + T);
+    if (T) await run('rm', ['-rf', T]);
   }
   async function swapBack() {
-    await sh('rm -rf ' + D + '/app.next && mv ' + D + '/app ' + D + '/app.next && mv ' + D + '/app.prev ' + D + '/app && mv ' + D + '/app.next ' + D + '/app.prev && sh ' + D + '/stage-home.sh');
+    await run('rm', ['-rf', D + '/app.next']);
+    await run('mv', [D + '/app', D + '/app.next']);
+    await run('mv', [D + '/app.prev', D + '/app']);
+    await run('mv', [D + '/app.next', D + '/app.prev']);
+    await run('/bin/sh', [D + '/stage-home.sh']);
     await reloadHome();
   }
   async function rollbackFrontend() {
@@ -207,7 +214,7 @@ function create(ctx) {
       setJob('working', 'Restarting the service');
       cp.spawn('/bin/sh', ['-c', 'sleep 1; sh ' + SERVICE_DIR + '/bootstrap.sh update ' + ver], { env: ENV, detached: true, stdio: 'ignore' }).unref();
     } catch (e) { setJob('error', String(e.message || e)); }
-    if (T) await sh('rm -rf ' + T);
+    if (T) await run('rm', ['-rf', T]);
   }
 
   async function setOptions(o) {
@@ -217,8 +224,13 @@ function create(ctx) {
     if (typeof o.liveTv === 'boolean') next.liveTv = o.liveTv;
     c.options = next; writeConf(c);
     if (next.debloat !== cur.debloat) {
-      if (next.debloat) await sh('ln -sf ' + D + '/15-cleanyourtv-debloat /var/lib/webosbrew/init.d/15-cleanyourtv-debloat; sh ' + D + '/debloat-stop.sh', 60000);
-      else await sh('rm -f /var/lib/webosbrew/init.d/15-cleanyourtv-debloat; sh ' + D + '/debloat-undo.sh', 60000);
+      if (next.debloat) {
+        await run('ln', ['-sf', D + '/15-cleanyourtv-debloat', '/var/lib/webosbrew/init.d/15-cleanyourtv-debloat'], 60000);
+        await run('/bin/sh', [D + '/debloat-stop.sh'], 60000);
+      } else {
+        await run('rm', ['-f', '/var/lib/webosbrew/init.d/15-cleanyourtv-debloat'], 60000);
+        await run('/bin/sh', [D + '/debloat-undo.sh'], 60000);
+      }
     }
     inputhook.ensure(next.inputKey, keys().input);
     return next;

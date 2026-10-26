@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>CleanYourTV</title>
-<script src="../../shared/api.js"></script><script src="../../shared/i18n.js"></script>
+<script src="../../shared/webostv.js"></script><script src="../../shared/api.js"></script><script src="../../shared/i18n.js"></script>
 <meta name="viewport" content="width=1920">
 <style>
 *{box-sizing:border-box;margin:0}
@@ -44,10 +44,11 @@ function t(s){return CYTV_I18N.t(s)}
 function ui(id,s){$(id).textContent=t(s)}
 document.documentElement.lang=CYTV_I18N.language((window.webOSSystem&&webOSSystem.locale)||navigator.language);
 function api(p,body){return CYTV.api(API+p,body)}
-function rootExec(cmd){return new Promise(function(res){try{var b=new PalmServiceBridge();b.onservicecallback=function(m){res(m)};
-  b.call('luna://org.webosbrew.hbchannel.service/exec',JSON.stringify({command:cmd}))}catch(e){res(JSON.stringify({returnValue:false,errorText:String(e)}))}})}
+function rootExec(cmd){return new Promise(function(res){try{
+  webOS.service.request('luna://org.webosbrew.hbchannel.service',{method:'exec',parameters:{command:cmd},onComplete:function(m){res(JSON.stringify(m))}})}
+  catch(e){res(JSON.stringify({returnValue:false,errorText:String(e)}))}})}
 function rootRun(cmd){return rootExec('umask 077; R=$(node '+SVC+'/helper/security.js run) || exit 1; '+cmd)}
-function launch(id,params){try{var b=new PalmServiceBridge();b.onservicecallback=function(){};b.call('luna://com.webos.applicationManager/launch',JSON.stringify({id:id,params:params||{}}))}catch(e){}}
+function launch(id,params){try{webOS.service.request('luna://com.webos.applicationManager',{method:'launch',parameters:{id:id,params:params||{}}})}catch(e){}}
 function onoff(v){return v?'On':'Off'}
 function banner(text,cls){var b=$('banner');b.textContent=cls==='err'?CYTV_I18N.error(text||''):t(text||'');b.className=cls||'';b.style.display=text?'':'none'}
 

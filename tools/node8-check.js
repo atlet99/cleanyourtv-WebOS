@@ -36,14 +36,15 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
 
 (async () => {
   // 3. compatibility layer against a local server
-  const srv = http.createServer((q, r) => { r.writeHead(200, { 'x-path': q.url, 'x-ua': q.headers['user-agent'] || '' });
-    if (q.url === '/pl.m3u') return r.end('#EXTM3U\n#EXTINF:-1 group-title="G",Chan A\nhttp://127.0.0.1:1/live/u/p/1.m3u8\n');
-    if (q.url === '/guide.xml') return r.end(guideXml);
-    if (q.url === '/guide.xml.gz') return r.end(zlib.gzipSync(Buffer.from(guideXml)));
-    if (q.url === '/guide-hdr.xml.gz') { r.writeHead(200, { 'content-encoding': 'gzip' }); return r.end(zlib.gzipSync(Buffer.from(guideXml))); }
-    if (q.url === '/guide-broken.gz') { r.writeHead(200, { 'content-encoding': 'gzip' }); r.write(zlib.gzipSync(Buffer.from(guideXml)).slice(0, 40)); return setTimeout(() => q.destroy(), 30); }
-    if (q.url === '/guide.min.xml') return r.end(guideXml.replace(/\n/g, ''));
-    r.end(q.method); }).listen(0, '127.0.0.1');
+  const srv = http.createServer((q, r) => {
+    const head = extra => r.writeHead(200, Object.assign({ 'x-path': q.url, 'x-ua': q.headers['user-agent'] || '' }, extra));
+    if (q.url === '/pl.m3u') { head(); return r.end('#EXTM3U\n#EXTINF:-1 group-title="G",Chan A\nhttp://127.0.0.1:1/live/u/p/1.m3u8\n'); }
+    if (q.url === '/guide.xml') { head(); return r.end(guideXml); }
+    if (q.url === '/guide.xml.gz') { head(); return r.end(zlib.gzipSync(Buffer.from(guideXml))); }
+    if (q.url === '/guide-hdr.xml.gz') { head({ 'content-encoding': 'gzip' }); return r.end(zlib.gzipSync(Buffer.from(guideXml))); }
+    if (q.url === '/guide-broken.gz') { head({ 'content-encoding': 'gzip' }); r.write(zlib.gzipSync(Buffer.from(guideXml)).slice(0, 40)); return setTimeout(() => q.destroy(), 30); }
+    if (q.url === '/guide.min.xml') { head(); return r.end(guideXml.replace(/\n/g, '')); }
+    head(); r.end(q.method); }).listen(0, '127.0.0.1');
   await new Promise(r => srv.on('listening', r));
   const port = srv.address().port;
   const g = await new Promise((resolve, reject) => nc.get(http, 'http://127.0.0.1:' + port + '/a/b?x=1#h', { headers: { 'User-Agent': 't' }, timeout: 3000 }, r => { let b = ''; r.on('data', c => b += c); r.on('end', () => resolve({ r, b })); }).on('error', reject));
@@ -53,6 +54,12 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
   let lo = 1e9, hi = -1, all = true; for (let i = 0; i < 3000; i++) { const n = nc.randomInt(100000, 1000000); if (n < 100000 || n >= 1000000 || n !== Math.floor(n)) all = false; lo = Math.min(lo, n); hi = Math.max(hi, n); }
   ok(all && hi - lo > 800000, 'randomInt stays in range and spreads');
   const dice = [0, 0, 0, 0, 0, 0]; for (let i = 0; i < 6000; i++) dice[nc.randomInt(0, 6)]++; ok(dice.every(c => c > 800 && c < 1200), 'randomInt is evenly spread');
+  {
+    let calls = 0;
+    await new Promise(res => { nc.execFile(cp, '/bin/sh', ['-c', 'sleep 30'], { timeout: 300 }, () => { calls++; res(); }); setTimeout(res, 2500); });
+    await new Promise(r => setTimeout(r, 150));
+    ok(calls === 1, 'execFile with a timeout answers exactly once (the Node 8 uv_close workaround)');
+  }
 
   // 4. Live TV pairing end to end: code, form post, playlist fetch
   const live = require(path.join(helper, 'live'));
@@ -110,6 +117,9 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
   const got = [await why(pp + '/ok.ts'), await why(pp + '/hls.m3u8'), await why(pp + '/drm.m3u8'), await why(pp + '/page'), await why(pp + '/go'), await why(pp + '/forbidden'), await why(pp + '/missing'), await why(pp + '/boom'), await why('http://127.0.0.1:1/x')];
   ok(got.join() === 'ok,ok,drm,notvideo,ok,refused,gone,server,unreachable', 'probe: ok, ok, drm, not a video, redirect followed, refused, gone, server error, unreachable (' + got.join() + ')');
   f = fake('/api/live/probe?key=zzzzzzzzzz&i=0'); await live.handle(f.req, f.res, '/api/live/probe', async () => ({})); ok(f.res.code === 404, 'probe: only streams of the playlist are asked about');
+  ok(live.tlsFail({ code: 'CERT_HAS_EXPIRED' }) && live.tlsFail({ code: 'DEPTH_ZERO_SELF_SIGNED_CERT' }) && live.tlsFail({ code: 'ERR_SSL_WRONG_VERSION_NUMBER' }) && live.tlsFail({ code: 'EPROTO' })
+    && !live.tlsFail({ code: 'ECONNRESET' }) && !live.tlsFail({ code: 'ENOTFOUND' }) && !live.tlsFail(null) && !live.tlsFail({}),
+    'probe: TLS failures are told apart from unreachable servers');
   ps.close();
   f = fake('/api/live/reset', 'POST'); await live.handle(f.req, f.res, '/api/live/reset', async () => ({}));
 
@@ -213,6 +223,18 @@ const call = (fn, url, method, body) => new Promise((resolve, reject) => {
 
   // 5. version comparison used by the updater
   const { cmp } = require(path.join(helper, 'manager')); ok(cmp('1.5.10', '1.5.9') > 0 && cmp('1.5.3', '1.5.3') === 0 && cmp('1.4.9', '1.5.0') < 0, 'version compare');
+  // 5b. hardening regressions: no raw execFile timeouts, no loose icon path prefixes, no shell strings in the manager
+  {
+    const src = f => fs.readFileSync(path.join(helper, f), 'utf8');
+    ok(!/cp\.execFile/.test(src('notify.js')) && /nc\.execFile\(cp/.test(src('notify.js')), 'notify calls luna through the netcompat execFile');
+    ok(/path\.resolve\(a\.folder\) \+ path\.sep/.test(src('helper.js')), 'icon paths are accepted only below the app folder itself');
+    ok(!/\bsh\(['"]/.test(src('manager.js')), 'manager runs system commands with argument arrays, not shell strings');
+    const page = f => fs.readFileSync(path.join(root, f), 'utf8');
+    for (const f of ['manager/app/index.html', 'picker/app/index.html']) {
+      ok(!/new PalmServiceBridge/.test(page(f)) && /shared\/webostv\.js/.test(page(f)), f + ': luna calls go through the vendored webOSTV.js');
+    }
+    ok(fs.existsSync(path.join(root, 'third-party', 'webostvjs', 'webOSTV.js')) && !/=>|`/.test(page('third-party/webostvjs/webOSTV.js').slice(0, 200)), 'the vendored webOSTV.js ships in the repository');
+  }
 
   // 6. update channels: stable release or a test build, against a mock of the GitHub API
   const rel = (tag, ver, fe, body, pre) => ({ tag_name: tag, name: pre ? 'Test build: ' + tag.replace(/^test-/, '') : tag, prerelease: !!pre, body, published_at: '2026-10-23T10:00:00Z', assets: [].concat(...['com.cleanyourtv.manager_' + ver + '_all.ipk', 'frontend-' + fe + '.tgz'].map(n => [{ name: n, browser_download_url: 'http://x/' + n }, { name: n + '.sha256', browser_download_url: 'http://x/' + n + '.sha256' }])) });

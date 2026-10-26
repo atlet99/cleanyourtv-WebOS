@@ -29,9 +29,12 @@ if release_version and not re.fullmatch(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d
     sys.exit('CYTV_RELEASE_VERSION must be a stable x.y.z version')
 version, fe = release_version or source_version, release_version or source_fe
 
-def page(body):   # inlines the shared scripts; spacing is pure CSS (see docs: no runtime layout fixes)
-    return re.sub(rb'<script src="(?:\.\./)+shared/(api|i18n)\.js"></script>',
-                  lambda m: b'<script>' + open(P('shared', m[1].decode() + '.js'), 'rb').read() + b'</script>', body)
+def page(body):   # inlines the shared scripts and the vendored webOSTV.js; spacing is pure CSS (see docs: no runtime layout fixes)
+    def repl(m):
+        name = m[1].decode()
+        src = P('third-party', 'webostvjs', 'webOSTV.js') if name == 'webostv' else P('shared', name + '.js')
+        return b'<script>' + open(src, 'rb').read() + b'</script>'
+    return re.sub(rb'<script src="(?:\.\./)+shared/(api|i18n|webostv)\.js"></script>', repl, body)
 
 def frontend_asset(rel, body):
     if release_version and rel == 'version.json':

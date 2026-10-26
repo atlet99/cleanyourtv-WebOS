@@ -37,7 +37,7 @@ const security = require('../helper/security');
   assert.strictEqual(await call('https://example.invalid', secret), 403);
   assert.strictEqual(calls, 0);
   assert.strictEqual(await call('file://com.cleanyourtv.manager-webos', secret), 200);
-  assert.strictEqual(await call('file://', secret), 200);   // Chromium 53 (webOS 5) serialises local origins this way
+  assert.strictEqual(await call('file://', secret), 200);   // webOS <=5 serialises local origins this way
   assert.strictEqual(await call('file:///media/x/index.html', secret), 200);
   assert.strictEqual(calls, 3);
   console.log('ok   opaque origins cannot call root API without a capability; local app token works');

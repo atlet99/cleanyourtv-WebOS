@@ -43,6 +43,23 @@ Nothing below is shipped in the package; the manager app downloads it on request
 | ONNX Runtime (inside the `moonshine-voice` package) | MIT | [microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) |
 | 64-bit GNU C library, libstdc++, libgcc (from `ubuntu-base` 22.04.5) | LGPL-2.1 / GPL-3.0 with runtime library exception | Ubuntu source packages `glibc` and `gcc-12` |
 
+## webOSTV.js / webOS.js (LG platform libraries)
+
+`third-party/webostvjs/` holds LG's official web platform libraries, downloaded unmodified from
+[webostv.developer.lge.com](https://webostv.developer.lge.com/develop/webostv-js/introduction) (Apache-2.0, the notice
+is `LICENSE-2.0.txt`). `webOSTV.js` is inlined into the manager and picker pages at build time
+(`ipk/build.py`), so their luna calls go through the official `webOS.service.request` wrapper instead of a hand-rolled
+`PalmServiceBridge`. `webOSTV-dev.js` and `webOS-legacy.js` (webOS.js 0.1.0, the webOS 1.x–3.x era build kept for the
+older-webOS compatibility work) are vendored for future use and are not shipped in the package.
+
+| File | Version | SHA-256 |
+|---|---|---|
+| `webOSTV.js` | 1.2.13 | `2e83e028aef8651ef0b79b25a70c7ebc076a36781486a68623634bc0c2162670` |
+| `webOSTV-dev.js` | 1.2.13 | `aa204c8b925b3214e9aa0f047a2874f8dda8aa0bb452936ca819368b349f0a51` |
+| `webOS-legacy.js` | 0.1.0 | `bc818e4dca8347079b14315b0c0502ec612eb00f40c84d525d091415d307d1d4` |
+
+File hashes are in `third-party/webostvjs/SHA256SUMS`.
+
 ## qrcode-generator (QR code for sharing the log)
 
 `third-party/qrcode-generator/qrcode.js` is [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) 1.4.4 by

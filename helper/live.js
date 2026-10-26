@@ -45,7 +45,8 @@ function get(url, depth = 0) {
         res.resume(); return resolve(get(new URL(res.headers.location, u).toString(), depth + 1));
       }
       if (res.statusCode !== 200) { res.resume(); return reject(new Error('server answered ' + res.statusCode)); }
-      resolve(res.headers['content-encoding'] === 'gzip' ? res.pipe(zlib.createGunzip()) : res);
+      if (res.headers['content-encoding'] === 'gzip') { const gz = zlib.createGunzip(); res.on('error', e => gz.destroy(e)); resolve(res.pipe(gz)); }
+      else resolve(res);
     });
     req.on('timeout', () => req.destroy(new Error('timed out')));
     req.on('error', reject);
@@ -104,6 +105,8 @@ function parseM3U(text) {
 // ---- why a stream does not play: ask the stream address the way the player does and sort the answer ----
 // Only addresses of channels in the stored playlist are ever asked, never one given by the page.
 const probeCache = {};
+const PROBE_ANY_CERT = true;   // diagnosis, not trust: IPTV hosts often sit behind odd certificates
+const tlsFail = e => /CERT|SSL|TLS/i.test(String(e && e.code)) || (e && e.code) === 'EPROTO';
 function probe(url) {
   return new Promise(resolve => {
     let u; try { u = new URL(url); } catch (_) { return resolve({ reason: 'unknown' }); }
@@ -111,7 +114,7 @@ function probe(url) {
     const fin = o => { if (!done) { done = true; o.ms = Date.now() - t0; resolve(o); } };
     const lib = u.protocol === 'https:' ? https : http;
     const go = (target, depth) => {
-      const req = nc.get(lib, target, { headers: { 'user-agent': 'cleanyourtv-live', range: 'bytes=0-8191', accept: '*/*' }, timeout: 8000, rejectUnauthorized: false }, res => {
+      const req = nc.get(lib, target, { headers: { 'user-agent': 'cleanyourtv-live', range: 'bytes=0-8191', accept: '*/*' }, timeout: 8000, rejectUnauthorized: PROBE_ANY_CERT }, res => {
         const st = res.statusCode;
         if (st >= 300 && st < 400 && res.headers.location && depth < 5) { res.resume(); return go(new URL(res.headers.location, target), depth + 1); }
         const type = String(res.headers['content-type'] || '').toLowerCase().split(';')[0].trim();
@@ -131,7 +134,7 @@ function probe(url) {
         res.on('end', end); res.on('close', end); res.on('error', () => fin({ reason: 'unreachable' }));
       });
       req.on('timeout', () => { req.destroy(); fin({ reason: 'slow' }); });
-      req.on('error', () => fin({ reason: 'unreachable' }));
+      req.on('error', e => fin({ reason: tlsFail(e) ? 'tls' : 'unreachable' }));
     };
     go(u, 0);
   });
@@ -347,4 +350,4 @@ async function handle(req, res, u, body) {
 if (settings.playlistUrl) setTimeout(() => refresh(false), 20000);
 setInterval(() => refresh(false), 6 * 3600 * 1000).unref();
 
-module.exports = { handle, parseM3U, probe, loadEpg, xtreamEpg };
+module.exports = { handle, parseM3U, probe, loadEpg, xtreamEpg, tlsFail };

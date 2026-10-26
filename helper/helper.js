@@ -109,7 +109,7 @@ http.createServer(async (req, res) => {
   let origin = req.headers.origin;
   const rawOrigin = origin;
   // webOS 6 sends "file://<appId>-webos" for local apps, older webOS serialises the origin as "file://" or
-  // "file:///<path>" (Chromium 53). Local file origins are one trust class: every request still needs the token.
+  // "file:///<path>". Local file origins are one trust class: every request still needs the token.
   if (/^file:\/\//.test(origin || '')) origin = 'null';
   if (origin !== undefined && origin !== 'null') { res.writeHead(403, { 'content-type': 'application/json' }); return res.end('{"error":"origin not allowed"}'); }
   // Chromium 79 (webOS 6) compares the answer with its own serialisation of a file origin, so for those origins echoing fails CORS: answer * there.
@@ -163,7 +163,7 @@ http.createServer(async (req, res) => {
     if (m) {
       const a = (await apps()).find(x => x.id === m[1]);
       const f = a && a.icon && path.join(a.folder, a.icon);
-      if (!f || !path.resolve(f).startsWith(path.resolve(a.folder)) || !fs.existsSync(f)) { res.writeHead(404); return res.end(); }
+      if (!f || !path.resolve(f).startsWith(path.resolve(a.folder) + path.sep) || !fs.existsSync(f)) { res.writeHead(404); return res.end(); }
       res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'max-age=3600' });
       return fs.createReadStream(f).pipe(res);
     }
